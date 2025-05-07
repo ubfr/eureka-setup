@@ -243,6 +243,8 @@ backend-modules:
   # eUsage
   mod-erm-usage:
   mod-erm-usage-harvester:
+    environment:
+      OKAPI_URL: http://mod-erm-usage-harvester-sc.eureka:8081
   mod-eusage-reports:
   # Serials
   mod-serials-management:
@@ -275,7 +277,7 @@ frontend-modules:
   folio_plugin-find-contact:
   folio_plugin-find-interface:
   folio_plugin-find-fund:
-  # ERN
+  # ERM
   folio_licenses:
   folio_plugin-find-license:
   folio_agreements:
