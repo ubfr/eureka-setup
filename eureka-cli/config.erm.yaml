@@ -249,6 +249,9 @@ backend-modules:
   # Serials
   mod-serials-management:
     port-server: 8080
+  # OA
+  mod-oa:
+    port-server: 8080
 frontend-modules:
   folio_stripes-core:
   folio_developer:
@@ -292,6 +295,8 @@ frontend-modules:
   folio_plugin-find-erm-usage-data-provider:
   # Serials
   folio_serials-management:
+  # OA
+  folio_oa:
 custom-frontend-modules:
   folio_authorization-roles:
     version: 2.1.109900000000179
