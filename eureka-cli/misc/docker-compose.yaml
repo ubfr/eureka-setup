@@ -55,7 +55,8 @@ services:
       "-c", "jit=off" 
     ]
     cpus: 2
-    mem_limit: 1.2g
+    shm_size: 1.2g
+    mem_limit: 2g
     memswap_limit: -1
     environment:
       POSTGRES_DB: postgres
