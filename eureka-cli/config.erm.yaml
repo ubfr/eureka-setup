@@ -104,6 +104,15 @@ backend-modules:
         -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
         -XX:MaxRAMPercentage=80.0 -Xms256m -Xmx2048m
         -Djdk.internal.httpclient.disableHostnameVerification=true
+  mod-okapi-facade:
+    environment:
+      TENANT_APPS_TTL: 600s
+      AM_TLS_ENABLED: "false"
+      TM_TLS_ENABLED: "false"
+      TE_TLS_ENABLED: "false"
+      AM_CLIENT_URL: http://mgr-applications.eureka:8081
+      MT_CLIENT_URL: http://mgr-tenants.eureka:8081
+      TE_URL: http://mgr-tenant-entitlements.eureka:8081
   # eUsage
   mod-erm-usage:
   mod-erm-usage-harvester:
