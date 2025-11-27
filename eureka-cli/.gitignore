@@ -1,10 +1,8 @@
-bin
 log
 tmp
 temp
-
-SETUP.md
-
-temp*.go
-config.temp-*.yaml
-drop_sidecar_cache.sh
+bin
+help
+*.exe
+*.out
+*.html
