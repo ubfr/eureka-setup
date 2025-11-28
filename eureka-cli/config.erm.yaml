@@ -94,9 +94,9 @@ sidecar-module:
 backend-modules:
   # ERM
   mod-licenses:
-    port-server: 8080
+    private-port: 8080
   mod-agreements:
-    port-server: 8080
+    private-port: 8080
     resources:
       memory: 3072
     environment:
@@ -121,10 +121,10 @@ backend-modules:
   mod-eusage-reports:
   # Serials
   mod-serials-management:
-    port-server: 8080
+    private-port: 8080
   # OA
   mod-oa:
-    port-server: 8080
+    private-port: 8080
 frontend-modules:
   # ACQ
   folio_plugin-find-contact:
