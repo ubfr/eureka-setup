@@ -4,7 +4,7 @@ FROM hashicorp/vault:$VAULT_VERSION
 
 RUN apk update && apk add --no-cache \
     curl=8.14.1-r2 \
-    jq=1.8.0-r0 \
+    jq=1.8.1-r0 \
     coreutils=9.7-r1 && \
     rm -rf /var/cache/apk/* && \
     addgroup -S folio && \
