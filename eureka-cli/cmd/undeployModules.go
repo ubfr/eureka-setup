@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +57,7 @@ func (run *Run) UndeployModules(removeApplication bool) error {
 	}
 	defer run.Config.DockerClient.Close(client)
 
-	pattern := fmt.Sprintf(constant.ProfileContainerPattern, run.Config.Action.ConfigProfile)
+	pattern := fmt.Sprintf(constant.ProfileContainerPattern, run.Config.Action.ConfigProfileName)
 	return run.Config.ModuleSvc.UndeployModuleByNamePattern(client, pattern)
 }
 

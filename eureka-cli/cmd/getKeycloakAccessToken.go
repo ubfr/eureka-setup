@@ -20,9 +20,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -100,6 +100,7 @@ func init() {
 	rootCmd.AddCommand(getKeycloakAccessTokenCmd)
 	getKeycloakAccessTokenCmd.PersistentFlags().StringVarP(&params.Tenant, action.Tenant.Long, action.Tenant.Short, "", action.Tenant.Description)
 	getKeycloakAccessTokenCmd.PersistentFlags().StringVarP(&params.TokenType, action.TokenType.Long, action.TokenType.Short, "", action.TokenType.Description)
+
 	if err := getKeycloakAccessTokenCmd.RegisterFlagCompletionFunc(action.TokenType.Long, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return constant.GetTokenTypes(), cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {

@@ -25,10 +25,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,9 +41,10 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "eureka-cli",
-	Short: "Eureka CLI",
-	Long:  `Eureka CLI orchestrates the deployment of a local Eureka-based development environment.`,
+	Use:     "eureka-cli",
+	Short:   "Eureka CLI",
+	Long:    `Eureka CLI orchestrates the deployment of a local Eureka-based development environment.`,
+	Version: fmt.Sprintf("%s (commit: %s, built: %s)", Version, Commit, BuildDate),
 }
 
 func Execute(fs *embed.FS) {
@@ -150,13 +151,14 @@ func init() {
 	profiles := constant.GetProfiles()
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVarP(&params.Profile, action.Profile.Long, action.Profile.Short, "combined", fmt.Sprintf(action.Profile.Description, profiles))
+	rootCmd.PersistentFlags().StringVarP(&params.ConfigFile, action.ConfigFile.Long, action.ConfigFile.Short, "", action.ConfigFile.Description)
+	rootCmd.PersistentFlags().BoolVarP(&params.OverwriteFiles, action.OverwriteFiles.Long, action.OverwriteFiles.Short, false, fmt.Sprintf(action.OverwriteFiles.Description, constant.ConfigDir))
+	rootCmd.PersistentFlags().BoolVarP(&params.EnableDebug, action.EnableDebug.Long, action.EnableDebug.Short, false, action.EnableDebug.Description)
+
 	if err := rootCmd.RegisterFlagCompletionFunc(action.Profile.Long, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return profiles, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		slog.Error(errors.RegisterFlagCompletionFailed(err).Error())
 		os.Exit(1)
 	}
-	rootCmd.PersistentFlags().StringVarP(&params.ConfigFile, action.ConfigFile.Long, action.ConfigFile.Short, "", action.ConfigFile.Description)
-	rootCmd.PersistentFlags().BoolVarP(&params.OverwriteFiles, action.OverwriteFiles.Long, action.OverwriteFiles.Short, false, fmt.Sprintf(action.OverwriteFiles.Description, constant.ConfigDir))
-	rootCmd.PersistentFlags().BoolVarP(&params.EnableDebug, action.EnableDebug.Long, action.EnableDebug.Short, false, action.EnableDebug.Description)
 }

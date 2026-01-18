@@ -19,11 +19,11 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/runconfig"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/runconfig"
 )
 
 // Run is a container that holds the RunConfig instance
@@ -85,14 +85,14 @@ func (run *Run) TenantPartition(consortiumName string, tenantType constant.Tenan
 
 	for _, value := range tenants {
 		entry := value.(map[string]any)
-		configTenant := entry["name"].(string)
+		configTenant := helpers.GetString(entry, "name")
 		if !helpers.HasTenant(configTenant, run.Config.Action.ConfigTenants) {
 			continue
 		}
 		if err := run.setKeycloakAccessTokenIntoContext(configTenant); err != nil {
 			return err
 		}
-		configDescription := entry["description"].(string)
+		configDescription := helpers.GetString(entry, "description")
 		if err = fn(configTenant, configDescription); err != nil {
 			return err
 		}

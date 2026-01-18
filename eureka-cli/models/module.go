@@ -5,8 +5,8 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -206,7 +206,6 @@ type Event struct {
 
 // RegistryExtract contains extracted information about modules from registries
 type RegistryExtract struct {
-	RegistryURLs      map[string]string
 	Modules           *ProxyModulesByRegistry
 	BackendModules    map[string]BackendModule
 	FrontendModules   map[string]FrontendModule

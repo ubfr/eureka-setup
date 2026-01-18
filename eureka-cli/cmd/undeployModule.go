@@ -20,11 +20,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,21 +52,23 @@ func (run *Run) UndeployModule() error {
 	}
 	defer run.Config.DockerClient.Close(client)
 
-	pattern := fmt.Sprintf(constant.SingleModuleOrSidecarContainerPattern, run.Config.Action.ConfigProfile, params.ModuleName)
+	pattern := fmt.Sprintf(constant.SingleModuleOrSidecarContainerPattern, run.Config.Action.ConfigProfileName, params.ModuleName)
 	return run.Config.ModuleSvc.UndeployModuleByNamePattern(client, pattern)
 }
 
 func init() {
 	rootCmd.AddCommand(undeployModuleCmd)
 	undeployModuleCmd.PersistentFlags().StringVarP(&params.ModuleName, action.ModuleName.Long, action.ModuleName.Short, "", action.ModuleName.Description)
+
+	if err := undeployModuleCmd.MarkPersistentFlagRequired(action.ModuleName.Long); err != nil {
+		slog.Error(errors.MarkFlagRequiredFailed(action.ModuleName, err).Error())
+		os.Exit(1)
+	}
+
 	if err := undeployModuleCmd.RegisterFlagCompletionFunc(action.ModuleName.Long, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return helpers.GetBackendModuleNames(viper.GetStringMap(field.BackendModules)), cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		slog.Error(errors.RegisterFlagCompletionFailed(err).Error())
-		os.Exit(1)
-	}
-	if err := undeployModuleCmd.MarkPersistentFlagRequired(action.ModuleName.Long); err != nil {
-		slog.Error(errors.MarkFlagRequiredFailed(action.ModuleName, err).Error())
 		os.Exit(1)
 	}
 }

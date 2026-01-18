@@ -7,11 +7,11 @@ import (
 	"os/exec"
 
 	"github.com/docker/docker/client"
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/execsvc"
-	"github.com/folio-org/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/execsvc"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
 )
 
 // TODO Add testcontainers tests
@@ -31,10 +31,7 @@ type DockerClient struct {
 
 // New creates a new DockerClient instance
 func New(action *action.Action, execSvc execsvc.CommandRunner) *DockerClient {
-	return &DockerClient{
-		Action:  action,
-		ExecSvc: execSvc,
-	}
+	return &DockerClient{Action: action, ExecSvc: execSvc}
 }
 
 func (dc *DockerClient) Create() (*client.Client, error) {

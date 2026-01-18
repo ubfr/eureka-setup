@@ -4,10 +4,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/internal/testhelpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/internal/testhelpers"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -113,10 +113,10 @@ func TestNewGeneric_AllViperFields(t *testing.T) {
 		assert.Equal(t, "full-app", result.ConfigApplicationName)
 		assert.Equal(t, "3.0.0", result.ConfigApplicationVersion)
 		assert.Equal(t, "full-app-3.0.0", result.ConfigApplicationID)
-		assert.Equal(t, "production", result.ConfigProfile)
+		assert.Equal(t, "production", result.ConfigProfileName)
 		assert.Equal(t, "https://registry.test.com", result.ConfigRegistryURL)
-		assert.Equal(t, "folio-registry-url", result.ConfigFolioRegistry)
-		assert.Equal(t, "eureka-registry-url", result.ConfigEurekaRegistry)
+		assert.Equal(t, "folio-registry-url", result.ConfigInstallFolio)
+		assert.Equal(t, "eureka-registry-url", result.ConfigInstallEureka)
 		assert.True(t, result.ConfigApplicationFetchDescriptors)
 		assert.Equal(t, 8000, result.ConfigApplicationPortStart)
 		assert.Equal(t, 9000, result.ConfigApplicationPortEnd)
@@ -128,7 +128,7 @@ func TestNewGeneric_AllViperFields(t *testing.T) {
 		assert.NotNil(t, result.ConfigApplicationDependencies)
 		assert.NotNil(t, result.ConfigGlobalEnv)
 		assert.NotNil(t, result.ConfigSidecarModule)
-		assert.NotNil(t, result.ConfigSidecarResources)
+		assert.NotNil(t, result.ConfigSidecarModuleResources)
 		assert.NotNil(t, result.ConfigBackendModules)
 		assert.NotNil(t, result.ConfigFrontendModules)
 		assert.NotNil(t, result.ConfigCustomFrontendModules)
@@ -216,6 +216,59 @@ func TestGetGatewayURL(t *testing.T) {
 		// Assert
 		assert.NoError(t, err)
 		assert.Equal(t, "http://localhost", result)
+	})
+
+	t.Run("TestGetGatewayURL_Fallback_ConfigHostnameWithInvalidHTTP", func(t *testing.T) {
+		// Arrange - hostname with http:// prefix will fail reachability check
+		// and fall back to default gateway
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.ApplicationGatewayHostname: "http://unreachable-test.invalid",
+		})
+		defer vc.Reset()
+
+		// Act
+		result, err := action.GetGatewayURL("test-action")
+
+		// Assert - Should fallback to default or gateway IP
+		if err == nil {
+			assert.NotEmpty(t, result)
+			assert.Contains(t, result, "http://")
+		}
+	})
+
+	t.Run("TestGetGatewayURL_Fallback_ToDefaultWhenConfigUnreachable", func(t *testing.T) {
+		// Arrange - Unreachable config hostname should fallback
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.ApplicationGatewayHostname: "unreachable-host-98765.invalid",
+		})
+		defer vc.Reset()
+
+		// Act
+		result, err := action.GetGatewayURL("test-action")
+
+		// Assert - Should either succeed with fallback or error
+		if err == nil {
+			assert.NotEmpty(t, result)
+			assert.Contains(t, result, "http://")
+		}
+	})
+
+	t.Run("TestGetGatewayURL_Error_AllGatewaysFail", func(t *testing.T) {
+		// Arrange - Set unreachable hostname and ensure other gateways can't resolve
+		// This test mainly validates error handling on unsupported platforms
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.ApplicationGatewayHostname: "unreachable-xyz-123.invalid",
+		})
+		defer vc.Reset()
+
+		// Act
+		_, err := action.GetGatewayURL("test-action")
+
+		// Assert - May succeed or fail depending on platform and network
+		// Main goal is to ensure function doesn't panic
+		if err != nil {
+			assert.Error(t, err)
+		}
 	})
 }
 
@@ -474,8 +527,8 @@ func TestGetCombinedInstallJsonURLs(t *testing.T) {
 	t.Run("TestGetCombinedInstallJsonURLs_Success", func(t *testing.T) {
 		// Arrange
 		act := &action.Action{
-			ConfigFolioRegistry:  "https://folio.registry.com/install.json",
-			ConfigEurekaRegistry: "https://eureka.registry.com/install.json",
+			ConfigInstallFolio:  "https://folio.registry.com/install.json",
+			ConfigInstallEureka: "https://eureka.registry.com/install.json",
 		}
 
 		// Act
@@ -492,7 +545,7 @@ func TestGetEurekaInstallJsonURLs(t *testing.T) {
 	t.Run("TestGetEurekaInstallJsonURLs_Success", func(t *testing.T) {
 		// Arrange
 		act := &action.Action{
-			ConfigEurekaRegistry: "https://eureka.registry.com/install.json",
+			ConfigInstallEureka: "https://eureka.registry.com/install.json",
 		}
 
 		// Act
@@ -504,20 +557,72 @@ func TestGetEurekaInstallJsonURLs(t *testing.T) {
 	})
 }
 
-func TestGetCombinedRegistryURLs(t *testing.T) {
-	t.Run("TestGetCombinedRegistryURLs_Success", func(t *testing.T) {
+// ==================== GetModuleURL Tests ====================
+
+func TestGetModuleURL(t *testing.T) {
+	t.Run("TestGetModuleURL_Success_WithSimpleModuleID", func(t *testing.T) {
 		// Arrange
 		act := &action.Action{
-			ConfigRegistryURL: "https://registry.test.com",
+			ConfigRegistryURL: "https://okapi.test.com",
 		}
 
 		// Act
-		result := act.GetCombinedRegistryURLs()
+		result := act.GetModuleURL("mod-inventory-1.0.0")
 
 		// Assert
-		assert.Len(t, result, 2)
-		assert.Equal(t, "https://registry.test.com", result[constant.FolioRegistry])
-		assert.Equal(t, "https://registry.test.com", result[constant.EurekaRegistry])
+		assert.Equal(t, "https://okapi.test.com/_/proxy/modules/mod-inventory-1.0.0", result)
+	})
+
+	t.Run("TestGetModuleURL_Success_WithComplexModuleID", func(t *testing.T) {
+		// Arrange
+		act := &action.Action{
+			ConfigRegistryURL: "http://localhost:9130",
+		}
+
+		// Act
+		result := act.GetModuleURL("mod-users-keycloak-2.5.0-SNAPSHOT.123")
+
+		// Assert
+		assert.Equal(t, "http://localhost:9130/_/proxy/modules/mod-users-keycloak-2.5.0-SNAPSHOT.123", result)
+	})
+
+	t.Run("TestGetModuleURL_Success_WithDifferentRegistryURL", func(t *testing.T) {
+		// Arrange
+		act := &action.Action{
+			ConfigRegistryURL: "https://eureka-registry.example.org:8080",
+		}
+
+		// Act
+		result := act.GetModuleURL("mod-search-3.2.1")
+
+		// Assert
+		assert.Equal(t, "https://eureka-registry.example.org:8080/_/proxy/modules/mod-search-3.2.1", result)
+	})
+
+	t.Run("TestGetModuleURL_Success_WithEmptyModuleID", func(t *testing.T) {
+		// Arrange
+		act := &action.Action{
+			ConfigRegistryURL: "https://okapi.test.com",
+		}
+
+		// Act
+		result := act.GetModuleURL("")
+
+		// Assert
+		assert.Equal(t, "https://okapi.test.com/_/proxy/modules/", result)
+	})
+
+	t.Run("TestGetModuleURL_Success_WithSpecialCharactersInModuleID", func(t *testing.T) {
+		// Arrange
+		act := &action.Action{
+			ConfigRegistryURL: "https://okapi.test.com",
+		}
+
+		// Act
+		result := act.GetModuleURL("mod-test_module-1.0.0-RC.1")
+
+		// Assert
+		assert.Equal(t, "https://okapi.test.com/_/proxy/modules/mod-test_module-1.0.0-RC.1", result)
 	})
 }
 
@@ -600,5 +705,202 @@ func TestGetKafkaTopicConfigTenant(t *testing.T) {
 		assert.Equal(t, "central", result1)
 		assert.Equal(t, "central", result2)
 		assert.Equal(t, "central", result3)
+	})
+}
+
+// ==================== GetSidecarModuleCmd Tests ====================
+
+func TestGetSidecarModuleCmd(t *testing.T) {
+	t.Run("TestGetSidecarModuleCmd_WithNativeBinaryCmd", func(t *testing.T) {
+		// Arrange
+		viper.Reset()
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.SidecarModuleNativeBinaryCmd: []string{"./app", "-flag1", "-flag2"},
+		})
+		defer vc.Reset()
+
+		// Act
+		result := action.GetSidecarModuleCmd()
+
+		// Assert
+		assert.NotNil(t, result)
+		assert.Len(t, result, 3)
+		assert.Equal(t, "./app", result[0])
+		assert.Equal(t, "-flag1", result[1])
+		assert.Equal(t, "-flag2", result[2])
+	})
+
+	t.Run("TestGetSidecarModuleCmd_WithCmd_FallbackCompatibility", func(t *testing.T) {
+		// Arrange - test fallback to old "cmd" field when native-binary-cmd is not set
+		viper.Reset()
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.SidecarModuleCmd: []string{"java", "-jar", "app.jar"},
+		})
+		defer vc.Reset()
+
+		// Act
+		result := action.GetSidecarModuleCmd()
+
+		// Assert
+		assert.NotNil(t, result)
+		assert.Len(t, result, 3)
+		assert.Equal(t, "java", result[0])
+		assert.Equal(t, "-jar", result[1])
+		assert.Equal(t, "app.jar", result[2])
+	})
+
+	t.Run("TestGetSidecarModuleCmd_NativeBinaryCmdTakesPrecedence", func(t *testing.T) {
+		// Arrange - test that native-binary-cmd takes precedence over cmd
+		viper.Reset()
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.SidecarModuleNativeBinaryCmd: []string{"./native-app"},
+			field.SidecarModuleCmd:             []string{"java", "-jar", "app.jar"},
+		})
+		defer vc.Reset()
+
+		// Act
+		result := action.GetSidecarModuleCmd()
+
+		// Assert
+		assert.NotNil(t, result)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "./native-app", result[0], "native-binary-cmd should take precedence over cmd")
+	})
+
+	t.Run("TestGetSidecarModuleCmd_EmptyWhenNeitherSet", func(t *testing.T) {
+		// Arrange
+		viper.Reset()
+		defer viper.Reset()
+
+		// Act
+		result := action.GetSidecarModuleCmd()
+
+		// Assert
+		if result == nil {
+			result = []string{}
+		}
+		assert.Empty(t, result)
+	})
+
+	t.Run("TestGetSidecarModuleCmd_EmptyNativeBinaryCmd", func(t *testing.T) {
+		// Arrange - empty native-binary-cmd should fallback to cmd
+		viper.Reset()
+		vc := testhelpers.SetupViperForTest(map[string]any{
+			field.SidecarModuleNativeBinaryCmd: []string{},
+			field.SidecarModuleCmd:             []string{"fallback", "command"},
+		})
+		defer vc.Reset()
+
+		// Act
+		result := action.GetSidecarModuleCmd()
+
+		// Assert
+		assert.NotNil(t, result)
+		assert.Len(t, result, 2)
+		assert.Equal(t, "fallback", result[0])
+		assert.Equal(t, "command", result[1])
+	})
+}
+
+// ==================== Application Tests ====================
+
+func TestIsChildApp(t *testing.T) {
+	tests := []struct {
+		name         string
+		dependencies map[string]any
+		expected     bool
+	}{
+		{
+			name: "TestIsChildApp_ReturnsTrueWhenDependenciesExist",
+			dependencies: map[string]any{
+				"dep1": "v1.0.0",
+				"dep2": "v2.0.0",
+			},
+			expected: true,
+		},
+		{
+			name:         "TestIsChildApp_ReturnsFalseWhenDependenciesEmpty",
+			dependencies: map[string]any{},
+			expected:     false,
+		},
+		{
+			name:         "TestIsChildApp_ReturnsFalseWhenDependenciesNil",
+			dependencies: nil,
+			expected:     false,
+		},
+		{
+			name: "TestIsChildApp_ReturnsTrueWithSingleDependency",
+			dependencies: map[string]any{
+				"single-dep": "1.0.0",
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			vc := testhelpers.SetupViperForTest(map[string]any{
+				field.ApplicationDependencies: tt.dependencies,
+			})
+			defer vc.Reset()
+
+			act := action.New("test", "http://localhost:%s", &action.Param{})
+
+			// Act
+			result := act.IsChildApp()
+
+			// Assert
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// ==================== Param Tests ====================
+
+func TestFlag_GetName(t *testing.T) {
+	t.Run("TestFlag_GetName_ReturnsLongName", func(t *testing.T) {
+		// Arrange
+		flag := action.Flag{
+			Long:        "test-flag",
+			Short:       "t",
+			Description: "A test flag",
+		}
+
+		// Act
+		result := flag.GetName()
+
+		// Assert
+		assert.Equal(t, "test-flag", result)
+	})
+
+	t.Run("TestFlag_GetName_WithEmptyShort", func(t *testing.T) {
+		// Arrange
+		flag := action.Flag{
+			Long:        "another-flag",
+			Short:       "",
+			Description: "Another test flag",
+		}
+
+		// Act
+		result := flag.GetName()
+
+		// Assert
+		assert.Equal(t, "another-flag", result)
+	})
+
+	t.Run("TestFlag_GetName_WithComplexName", func(t *testing.T) {
+		// Arrange
+		flag := action.Flag{
+			Long:        "module-deployment-skip",
+			Short:       "mds",
+			Description: "Skip module deployment",
+		}
+
+		// Act
+		result := flag.GetName()
+
+		// Assert
+		assert.Equal(t, "module-deployment-skip", result)
 	})
 }

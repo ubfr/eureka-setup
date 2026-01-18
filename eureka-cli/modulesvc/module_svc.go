@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/dockerclient"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/httpclient"
-	"github.com/folio-org/eureka-cli/models"
-	"github.com/folio-org/eureka-cli/moduleenv"
-	"github.com/folio-org/eureka-cli/registrysvc"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/dockerclient"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/httpclient"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/moduleenv"
+	"github.com/folio-org/eureka-setup/eureka-cli/registrysvc"
 )
 
 // ModuleProcessor defines the composite interface for all module-related operations
@@ -22,6 +22,7 @@ type ModuleProcessor interface {
 	ModuleReadinessChecker
 	ModuleProvisioner
 	ModuleManager
+	ModuleCustomizer
 }
 
 // ModuleProvisioner defines the interface for module provisioning operations
@@ -29,7 +30,8 @@ type ModuleProvisioner interface {
 	GetBackendModule(containers *models.Containers, moduleName string) (*models.BackendModule, *models.ProxyModule)
 	GetModuleImageVersion(backendModule models.BackendModule, module *models.ProxyModule) string
 	GetSidecarImage(modules []*models.ProxyModule) (string, bool, error)
-	GetModuleImage(moduleVersion string, module *models.ProxyModule) string
+	GetModuleImage(module *models.ProxyModule, moduleVersion string) string
+	GetLocalModuleImage(namespace, moduleName, moduleVersion string) string
 	GetModuleEnv(container *models.Containers, module *models.ProxyModule, backendModule models.BackendModule) []string
 	GetSidecarEnv(containers *models.Containers, module *models.ProxyModule, backendModule models.BackendModule, moduleURL, sidecarURL string) []string
 }
@@ -126,8 +128,12 @@ func (ms *ModuleSvc) findRegistrySidecarImageVersion(modules []*models.ProxyModu
 	return "", false
 }
 
-func (ms *ModuleSvc) GetModuleImage(moduleVersion string, module *models.ProxyModule) string {
+func (ms *ModuleSvc) GetModuleImage(module *models.ProxyModule, moduleVersion string) string {
 	return fmt.Sprintf("%s/%s:%s", ms.RegistrySvc.GetNamespace(moduleVersion), module.Metadata.Name, moduleVersion)
+}
+
+func (ms *ModuleSvc) GetLocalModuleImage(namespace, moduleName, moduleVersion string) string {
+	return fmt.Sprintf("%s/%s:%s", namespace, moduleName, moduleVersion)
 }
 
 func (ms *ModuleSvc) GetModuleEnv(container *models.Containers, module *models.ProxyModule, backendModule models.BackendModule) []string {

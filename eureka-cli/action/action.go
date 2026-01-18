@@ -8,97 +8,97 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
 	"github.com/spf13/viper"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
-// Action is a container that holds the state (context) of current deployment
+// Action is a container that holds the state (context) of the current deployment (command being executed)
 type Action struct {
-	Name                              string
-	GatewayURLTemplate                string
-	ReservedPorts                     []int
-	Param                             *Param
-	Caser                             cases.Caser
-	VaultRootToken                    string
-	KeycloakAccessToken               string
-	KeycloakMasterAccessToken         string
-	ConfigProfile                     string
-	ConfigRegistryURL                 string
-	ConfigFolioRegistry               string
-	ConfigEurekaRegistry              string
-	ConfigPortStart                   int
-	ConfigPortEnd                     int
-	ConfigManagementTopicSharing      bool
-	ConfigTopicSharingTenant          string
-	ConfigApplication                 map[string]any
-	ConfigApplicationName             string
-	ConfigApplicationVersion          string
-	ConfigApplicationID               string
-	ConfigApplicationFetchDescriptors bool
-	ConfigApplicationPortStart        int
-	ConfigApplicationPortEnd          int
-	ConfigApplicationDependencies     map[string]any
-	ConfigApplicationStripesBranch    string
-	ConfigApplicationGatewayHostname  string
-	ConfigNamespacePlatformCompleteUI string
-	ConfigGlobalEnv                   map[string]string
-	ConfigEnvFolio                    string
-	ConfigSidecarModule               map[string]any
-	ConfigSidecarResources            map[string]any
-	ConfigSidecarNativeBinaryCmd      []string
-	ConfigBackendModules              map[string]any
-	ConfigFrontendModules             map[string]any
-	ConfigCustomFrontendModules       map[string]any
-	ConfigTenants                     map[string]any
-	ConfigRoles                       map[string]any
-	ConfigUsers                       map[string]any
-	ConfigRolesCapabilitySets         map[string]any
-	ConfigConsortiums                 map[string]any
+	Name                               string
+	GatewayURLTemplate                 string
+	ReservedPorts                      []int
+	Param                              *Param
+	Caser                              cases.Caser
+	VaultRootToken                     string
+	KeycloakAccessToken                string
+	KeycloakMasterAccessToken          string
+	ConfigProfileName                  string
+	ConfigRegistryURL                  string
+	ConfigInstallFolio                 string
+	ConfigInstallEureka                string
+	ConfigPortStart                    int
+	ConfigPortEnd                      int
+	ConfigManagementTopicSharing       bool
+	ConfigTopicSharingTenant           string
+	ConfigApplication                  map[string]any
+	ConfigApplicationName              string
+	ConfigApplicationVersion           string
+	ConfigApplicationID                string
+	ConfigApplicationFetchDescriptors  bool
+	ConfigApplicationPortStart         int
+	ConfigApplicationPortEnd           int
+	ConfigApplicationDependencies      map[string]any
+	ConfigApplicationStripesBranch     string
+	ConfigApplicationGatewayHostname   string
+	ConfigNamespacePlatformCompleteUI  string
+	ConfigGlobalEnv                    map[string]string
+	ConfigEnvFolio                     string
+	ConfigSidecarModule                map[string]any
+	ConfigSidecarModuleResources       map[string]any
+	ConfigSidecarModuleNativeBinaryCmd []string
+	ConfigBackendModules               map[string]any
+	ConfigFrontendModules              map[string]any
+	ConfigCustomFrontendModules        map[string]any
+	ConfigTenants                      map[string]any
+	ConfigRoles                        map[string]any
+	ConfigUsers                        map[string]any
+	ConfigRolesCapabilitySets          map[string]any
+	ConfigConsortiums                  map[string]any
 }
 
 func New(name string, gatewayURL string, actionParam *Param) *Action {
 	applicationName := viper.GetString(field.ApplicationName)
 	applicationVersion := viper.GetString(field.ApplicationVersion)
 	return &Action{
-		Name:                              name,
-		GatewayURLTemplate:                gatewayURL,
-		ReservedPorts:                     []int{},
-		Param:                             actionParam,
-		Caser:                             cases.Lower(language.English),
-		ConfigProfile:                     viper.GetString(field.ProfileName),
-		ConfigRegistryURL:                 viper.GetString(field.RegistryURL),
-		ConfigFolioRegistry:               viper.GetString(field.InstallFolio),
-		ConfigEurekaRegistry:              viper.GetString(field.InstallEureka),
-		ConfigManagementTopicSharing:      viper.GetBool(field.BackendModulesManagementTopicSharing),
-		ConfigTopicSharingTenant:          viper.GetString(field.EnvTopicSharingTenant),
-		ConfigApplication:                 viper.GetStringMap(field.Application),
-		ConfigApplicationName:             applicationName,
-		ConfigApplicationVersion:          applicationVersion,
-		ConfigApplicationID:               fmt.Sprintf("%s-%s", applicationName, applicationVersion),
-		ConfigApplicationFetchDescriptors: viper.GetBool(field.ApplicationFetchDescriptors),
-		ConfigApplicationPortStart:        viper.GetInt(field.ApplicationPortStart),
-		ConfigApplicationPortEnd:          viper.GetInt(field.ApplicationPortEnd),
-		ConfigApplicationDependencies:     viper.GetStringMap(field.ApplicationDependencies),
-		ConfigApplicationStripesBranch:    viper.GetString(field.ApplicationStripesBranch),
-		ConfigApplicationGatewayHostname:  viper.GetString(field.ApplicationGatewayHostname),
-		ConfigNamespacePlatformCompleteUI: viper.GetString(field.NamespacesPlatformCompleteUI),
-		ConfigGlobalEnv:                   viper.GetStringMapString(field.Env),
-		ConfigEnvFolio:                    viper.GetString(field.EnvFolio),
-		ConfigSidecarModule:               viper.GetStringMap(field.SidecarModule),
-		ConfigSidecarResources:            viper.GetStringMap(field.SidecarModuleResources),
-		ConfigSidecarNativeBinaryCmd:      viper.GetStringSlice(field.SidecarModuleNativeBinaryCmd),
-		ConfigBackendModules:              viper.GetStringMap(field.BackendModules),
-		ConfigFrontendModules:             viper.GetStringMap(field.FrontendModules),
-		ConfigCustomFrontendModules:       viper.GetStringMap(field.CustomFrontendModules),
-		ConfigTenants:                     viper.GetStringMap(field.Tenants),
-		ConfigRoles:                       viper.GetStringMap(field.Roles),
-		ConfigUsers:                       viper.GetStringMap(field.Users),
-		ConfigRolesCapabilitySets:         viper.GetStringMap(field.RolesCapabilitySetsEntry),
-		ConfigConsortiums:                 viper.GetStringMap(field.Consortiums),
+		Name:                               name,
+		GatewayURLTemplate:                 gatewayURL,
+		ReservedPorts:                      []int{},
+		Param:                              actionParam,
+		Caser:                              cases.Lower(language.English),
+		ConfigProfileName:                  viper.GetString(field.ProfileName),
+		ConfigRegistryURL:                  viper.GetString(field.RegistryURL),
+		ConfigInstallFolio:                 viper.GetString(field.InstallFolio),
+		ConfigInstallEureka:                viper.GetString(field.InstallEureka),
+		ConfigManagementTopicSharing:       viper.GetBool(field.BackendModulesManagementTopicSharing),
+		ConfigTopicSharingTenant:           viper.GetString(field.EnvTopicSharingTenant),
+		ConfigApplication:                  viper.GetStringMap(field.Application),
+		ConfigApplicationName:              applicationName,
+		ConfigApplicationVersion:           applicationVersion,
+		ConfigApplicationID:                fmt.Sprintf("%s-%s", applicationName, applicationVersion),
+		ConfigApplicationFetchDescriptors:  viper.GetBool(field.ApplicationFetchDescriptors),
+		ConfigApplicationPortStart:         viper.GetInt(field.ApplicationPortStart),
+		ConfigApplicationPortEnd:           viper.GetInt(field.ApplicationPortEnd),
+		ConfigApplicationDependencies:      viper.GetStringMap(field.ApplicationDependencies),
+		ConfigApplicationStripesBranch:     viper.GetString(field.ApplicationStripesBranch),
+		ConfigApplicationGatewayHostname:   viper.GetString(field.ApplicationGatewayHostname),
+		ConfigNamespacePlatformCompleteUI:  viper.GetString(field.NamespacesPlatformCompleteUI),
+		ConfigGlobalEnv:                    viper.GetStringMapString(field.Env),
+		ConfigEnvFolio:                     viper.GetString(field.EnvFolio),
+		ConfigSidecarModule:                viper.GetStringMap(field.SidecarModule),
+		ConfigSidecarModuleResources:       viper.GetStringMap(field.SidecarModuleResources),
+		ConfigSidecarModuleNativeBinaryCmd: GetSidecarModuleCmd(),
+		ConfigBackendModules:               viper.GetStringMap(field.BackendModules),
+		ConfigFrontendModules:              viper.GetStringMap(field.FrontendModules),
+		ConfigCustomFrontendModules:        viper.GetStringMap(field.CustomFrontendModules),
+		ConfigTenants:                      viper.GetStringMap(field.Tenants),
+		ConfigRoles:                        viper.GetStringMap(field.Roles),
+		ConfigUsers:                        viper.GetStringMap(field.Users),
+		ConfigRolesCapabilitySets:          viper.GetStringMap(field.RolesCapabilitySetsEntry),
+		ConfigConsortiums:                  viper.GetStringMap(field.Consortiums),
 	}
 }
 
@@ -108,7 +108,22 @@ func (a *Action) GetRequestURL(port string, route string) string {
 	return fmt.Sprintf(a.GatewayURLTemplate, port) + route
 }
 
+// ==================== Application ====================
+
+func (a *Action) IsChildApp() bool {
+	return len(a.ConfigApplicationDependencies) > 0
+}
+
 // ==================== Environment ====================
+
+func GetSidecarModuleCmd() []string {
+	nativeBinaryCmd := viper.GetStringSlice(field.SidecarModuleNativeBinaryCmd)
+	if len(nativeBinaryCmd) > 0 {
+		return nativeBinaryCmd
+	}
+
+	return viper.GetStringSlice(field.SidecarModuleCmd)
+}
 
 func (a *Action) GetConfigEnvVars(key string) []string {
 	var envVars []string
@@ -160,28 +175,25 @@ func (a *Action) isPortFree(portStart, portEnd int, port int) bool {
 	return true
 }
 
-// ==================== Install JSON URLs ====================
+// ==================== Install Json URLs ====================
 
 func (a *Action) GetCombinedInstallJsonURLs() map[string]string {
 	return map[string]string{
-		constant.FolioRegistry:  a.ConfigFolioRegistry,
-		constant.EurekaRegistry: a.ConfigEurekaRegistry,
+		constant.FolioRegistry:  a.ConfigInstallFolio,
+		constant.EurekaRegistry: a.ConfigInstallEureka,
 	}
 }
 
 func (a *Action) GetEurekaInstallJsonURLs() map[string]string {
 	return map[string]string{
-		constant.EurekaRegistry: a.ConfigEurekaRegistry,
+		constant.EurekaRegistry: a.ConfigInstallEureka,
 	}
 }
 
-// ==================== Registry URLs  ====================
+// ==================== Module URL  ====================
 
-func (a *Action) GetCombinedRegistryURLs() map[string]string {
-	return map[string]string{
-		constant.FolioRegistry:  a.ConfigRegistryURL,
-		constant.EurekaRegistry: a.ConfigRegistryURL,
-	}
+func (a *Action) GetModuleURL(moduleID string) string {
+	return fmt.Sprintf("%s/_/proxy/modules/%s", a.ConfigRegistryURL, moduleID)
 }
 
 // ==================== Viper ====================

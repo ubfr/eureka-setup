@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/internal/testhelpers"
-	"github.com/folio-org/eureka-cli/models"
-	"github.com/folio-org/eureka-cli/registrysvc"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/internal/testhelpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/registrysvc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -115,7 +115,7 @@ func TestGetNamespace_SnapshotVersion(t *testing.T) {
 	namespace := svc.GetNamespace("1.0.0-SNAPSHOT")
 
 	// Assert
-	assert.Equal(t, constant.SnapshotRegistry, namespace)
+	assert.Equal(t, constant.SnapshotNamespace, namespace)
 	mockAWS.AssertExpectations(t)
 }
 
@@ -132,7 +132,7 @@ func TestGetNamespace_ReleaseVersion(t *testing.T) {
 	namespace := svc.GetNamespace("1.0.0")
 
 	// Assert
-	assert.Equal(t, constant.ReleaseRegistry, namespace)
+	assert.Equal(t, constant.ReleaseNamespace, namespace)
 	mockAWS.AssertExpectations(t)
 }
 

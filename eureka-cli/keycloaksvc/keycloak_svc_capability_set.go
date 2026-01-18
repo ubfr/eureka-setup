@@ -2,14 +2,16 @@ package keycloaksvc
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	apperrors "github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
 )
 
 // KeycloakCapabilitySetManager defines the interface for Keycloak capability set management operations
@@ -28,7 +30,7 @@ func (ks *KeycloakSvc) GetCapabilitySets(headers map[string]string) ([]any, erro
 	}
 
 	for _, descriptor := range applications.ApplicationDescriptors {
-		applicationID := descriptor["id"].(string)
+		applicationID := helpers.GetString(descriptor, "id")
 		requestURL := ks.Action.GetRequestURL(constant.KongPort, fmt.Sprintf("/capability-sets?query=applicationId==%s&offset=0&limit=10000", applicationID))
 
 		var decodedResponse models.KeycloakCapabilitySetsResponse
@@ -97,17 +99,17 @@ func (ks *KeycloakSvc) AttachCapabilitySetsToRoles(tenantName string) error {
 	requestURL := ks.Action.GetRequestURL(constant.KongPort, "/roles/capability-sets")
 	for _, roleValue := range roles {
 		entry := roleValue.(map[string]any)
-		roleName := ks.Action.Caser.String(entry["name"].(string))
+		roleName := ks.Action.Caser.String(helpers.GetString(entry, "name"))
 		if ks.Action.ConfigRoles[roleName] == nil {
 			continue
 		}
 
-		rolesMapConfig := ks.Action.ConfigRoles[roleName].(map[string]any)
-		if tenantName != rolesMapConfig[field.RolesTenantEntry].(string) {
+		rolesMapConfig := helpers.GetMapOrDefault(ks.Action.ConfigRoles, roleName, nil)
+		if tenantName != helpers.GetString(rolesMapConfig, field.RolesTenantEntry) {
 			continue
 		}
 
-		rolesCapabilitySets := rolesMapConfig[field.RolesCapabilitySetsEntry].([]any)
+		rolesCapabilitySets := helpers.GetAnySlice(rolesMapConfig, field.RolesCapabilitySetsEntry)
 		capabilitySets, err := ks.populateCapabilitySets(headers, rolesCapabilitySets)
 		if err != nil {
 			return err
@@ -124,7 +126,7 @@ func (ks *KeycloakSvc) AttachCapabilitySetsToRoles(tenantName string) error {
 			slog.Info(ks.Action.Name, "text", "Attaching capability sets", "start", lowerBound, "end", upperBound, "total", len(capabilitySets), "role", roleName, "tenant", tenantName)
 
 			payload, err := json.Marshal(map[string]any{
-				"roleId":           entry["id"].(string),
+				"roleId":           helpers.GetString(entry, "id"),
 				"capabilitySetIds": batchCapabilitySetIDs,
 			})
 			if err != nil {
@@ -153,7 +155,8 @@ func (ks *KeycloakSvc) populateCapabilitySets(headers map[string]string, rolesCa
 				return nil, err
 			}
 			for _, value := range capabilitySetsFound {
-				capabilitySets = append(capabilitySets, value.(map[string]any)["id"].(string))
+				rawCapabilitySets := value.(map[string]any)
+				capabilitySets = append(capabilitySets, helpers.GetString(rawCapabilitySets, "id"))
 			}
 		}
 		return capabilitySets, nil
@@ -165,7 +168,8 @@ func (ks *KeycloakSvc) populateCapabilitySets(headers map[string]string, rolesCa
 		return nil, err
 	}
 	for _, value := range allCapabilitySets {
-		capabilitySets = append(capabilitySets, value.(map[string]any)["id"].(string))
+		rawCapabilitySets := value.(map[string]any)
+		capabilitySets = append(capabilitySets, helpers.GetString(rawCapabilitySets, "id"))
 	}
 
 	return capabilitySets, nil
@@ -188,13 +192,17 @@ func (ks *KeycloakSvc) DetachCapabilitySetsFromRoles(tenantName string) error {
 
 	for _, value := range roles {
 		entry := value.(map[string]any)
-		roleName := ks.Action.Caser.String(entry["name"].(string))
+		roleName := ks.Action.Caser.String(helpers.GetString(entry, "name"))
 		if ks.Action.ConfigRoles[roleName] == nil {
 			continue
 		}
 
-		requestURL := ks.Action.GetRequestURL(constant.KongPort, fmt.Sprintf("/roles/%s/capability-sets", entry["id"].(string)))
+		requestURL := ks.Action.GetRequestURL(constant.KongPort, fmt.Sprintf("/roles/%s/capability-sets", helpers.GetString(entry, "id")))
 		if err := ks.HTTPClient.Delete(requestURL, headers); err != nil {
+			if errors.Is(err, apperrors.ErrHTTP404NotFound) {
+				slog.Debug(ks.Action.Name, "text", "No capability sets to detach (already detached or not found)", "role", roleName, "tenant", tenantName)
+				continue
+			}
 			return err
 		}
 		slog.Info(ks.Action.Name, "text", "Detached capability sets", "role", roleName, "tenant", tenantName)

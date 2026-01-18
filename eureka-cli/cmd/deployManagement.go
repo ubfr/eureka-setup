@@ -19,10 +19,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
 	"github.com/spf13/cobra"
 )
 
@@ -49,8 +49,8 @@ func (run *Run) DeployManagement() error {
 	}
 
 	slog.Info(run.Config.Action.Name, "text", "READING BACKEND MODULE REGISTRIES")
-	instalJsonURLs := run.Config.Action.GetEurekaInstallJsonURLs()
-	modules, err := run.Config.RegistrySvc.GetModules(instalJsonURLs, true, true)
+	installJsonURLs := run.Config.Action.GetEurekaInstallJsonURLs()
+	modules, err := run.Config.RegistrySvc.GetModules(installJsonURLs, true, true)
 	if err != nil {
 		return err
 	}
@@ -93,12 +93,8 @@ func (run *Run) DeployManagement() error {
 	if err := run.setKeycloakMasterAccessTokenIntoContext(constant.Password); err != nil {
 		return err
 	}
-	if err := run.Config.KeycloakSvc.UpdateRealmAccessTokenSettings(constant.KeycloakMasterRealm, constant.KeycloakMasterRealmAccessTokenLifespan); err != nil {
-		return err
-	}
-	slog.Info(run.Config.Action.Name, "text", "Realm settings have been updated", "realm", constant.KeycloakMasterRealm)
 
-	return nil
+	return run.Config.KeycloakSvc.UpdateRealmAccessTokenSettings(constant.KeycloakMasterRealm, constant.KeycloakMasterRealmAccessTokenLifespan)
 }
 
 func init() {

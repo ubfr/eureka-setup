@@ -19,11 +19,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
 	"github.com/spf13/cobra"
 )
 
@@ -56,8 +56,8 @@ func (run *Run) DeployModules() error {
 	}
 
 	slog.Info(run.Config.Action.Name, "text", "READING BACKEND MODULE REGISTRIES")
-	instalJsonURLs := run.Config.Action.GetCombinedInstallJsonURLs()
-	modules, err := run.Config.RegistrySvc.GetModules(instalJsonURLs, true, true)
+	installJsonURLs := run.Config.Action.GetCombinedInstallJsonURLs()
+	modules, err := run.Config.RegistrySvc.GetModules(installJsonURLs, true, true)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (run *Run) DeployModules() error {
 	}
 
 	slog.Info(run.Config.Action.Name, "text", "DEPLOYING MODULES")
-	sidecarResources := helpers.CreateResources(false, run.Config.Action.ConfigSidecarResources)
+	sidecarResources := helpers.CreateResources(false, run.Config.Action.ConfigSidecarModuleResources)
 	deployedModules, err := run.Config.ModuleSvc.DeployModules(client, containers, sidecarImage, sidecarResources)
 	if err != nil {
 		return err
@@ -112,8 +112,7 @@ func (run *Run) DeployModules() error {
 		return err
 	}
 
-	return run.Config.ManagementSvc.CreateApplications(&models.RegistryExtract{
-		RegistryURLs:      run.Config.Action.GetCombinedRegistryURLs(),
+	return run.Config.ManagementSvc.CreateApplication(&models.RegistryExtract{
 		Modules:           modules,
 		BackendModules:    backendModules,
 		FrontendModules:   frontendModules,

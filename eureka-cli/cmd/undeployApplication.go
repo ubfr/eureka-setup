@@ -19,8 +19,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ var undeployApplicationCmd = &cobra.Command{
 			return err
 		}
 
-		if len(run.Config.Action.ConfigApplicationDependencies) > 0 {
+		if run.Config.Action.IsChildApp() {
 			err = run.UndeployChildApplication()
 		} else {
 			err = run.UndeployApplication()

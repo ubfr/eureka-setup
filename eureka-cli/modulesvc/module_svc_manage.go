@@ -15,10 +15,10 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
-	"github.com/folio-org/eureka-cli/constant"
-	appErrors "github.com/folio-org/eureka-cli/errors"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	appErrors "github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
 )
 
 // ModuleManager defines the interface for managing module deployment and lifecycle
@@ -110,7 +110,7 @@ func (ms *ModuleSvc) DeployModules(client *client.Client, containers *models.Con
 			if err := ms.DeployModule(client, &models.Container{
 				Name: module.Metadata.Name,
 				Config: &container.Config{
-					Image:        ms.GetModuleImage(version, module),
+					Image:        ms.GetModuleImage(module, version),
 					Hostname:     module.Metadata.Name,
 					Env:          ms.GetModuleEnv(containers, module, backendModule),
 					ExposedPorts: *backendModule.ModuleExposedPorts,
@@ -174,7 +174,7 @@ func (ms *ModuleSvc) deploySidecarAsync(wg *sync.WaitGroup, errCh chan<- error, 
 			Hostname:     r.Module.Metadata.SidecarName,
 			Env:          ms.GetSidecarEnv(r.Containers, r.Module, r.BackendModule, "", ""),
 			ExposedPorts: *r.BackendModule.SidecarExposedPorts,
-			Cmd:          helpers.GetConfigSidecarCmd(ms.Action.ConfigSidecarNativeBinaryCmd),
+			Cmd:          helpers.GetConfigSidecarCmd(ms.Action.ConfigSidecarModuleNativeBinaryCmd),
 		},
 		HostConfig: &container.HostConfig{
 			PortBindings:  *r.BackendModule.SidecarPortBindings,
@@ -228,7 +228,7 @@ func (ms *ModuleSvc) getContainerName(container *models.Container) string {
 		return fmt.Sprintf("eureka-%s", container.Name)
 	}
 
-	return fmt.Sprintf("eureka-%s-%s", ms.Action.ConfigProfile, container.Name)
+	return fmt.Sprintf("eureka-%s-%s", ms.Action.ConfigProfileName, container.Name)
 }
 
 func (ms *ModuleSvc) UndeployModuleByNamePattern(client *client.Client, pattern string) error {

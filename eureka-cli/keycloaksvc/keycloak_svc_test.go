@@ -9,10 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/internal/testhelpers"
-	"github.com/folio-org/eureka-cli/keycloaksvc"
-	"github.com/folio-org/eureka-cli/models"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	apperrors "github.com/folio-org/eureka-setup/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/internal/testhelpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/keycloaksvc"
+	"github.com/folio-org/eureka-setup/eureka-cli/models"
 	vault "github.com/hashicorp/vault-client-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -70,8 +71,21 @@ func (m *MockManagementSvc) GetApplications() (models.ApplicationsResponse, erro
 	return args.Get(0).(models.ApplicationsResponse), args.Error(1)
 }
 
-func (m *MockManagementSvc) CreateApplications(extract *models.RegistryExtract) error {
+func (m *MockManagementSvc) GetLatestApplication() (map[string]any, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]any), args.Error(1)
+}
+
+func (m *MockManagementSvc) CreateApplication(extract *models.RegistryExtract) error {
 	args := m.Called(extract)
+	return args.Error(0)
+}
+
+func (m *MockManagementSvc) CreateNewApplication(r *models.ApplicationUpgradeRequest) error {
+	args := m.Called(r)
 	return args.Error(0)
 }
 
@@ -80,9 +94,19 @@ func (m *MockManagementSvc) RemoveApplication(applicationID string) error {
 	return args.Error(0)
 }
 
+func (m *MockManagementSvc) RemoveApplications(applicationName, ignoreAppID string) error {
+	args := m.Called(applicationName, ignoreAppID)
+	return args.Error(0)
+}
+
 func (m *MockManagementSvc) GetModuleDiscovery(name string) (models.ModuleDiscoveryResponse, error) {
 	args := m.Called(name)
 	return args.Get(0).(models.ModuleDiscoveryResponse), args.Error(1)
+}
+
+func (m *MockManagementSvc) CreateNewModuleDiscovery(newDiscoveryModules []map[string]string) error {
+	args := m.Called(newDiscoveryModules)
+	return args.Error(0)
 }
 
 func (m *MockManagementSvc) UpdateModuleDiscovery(id string, restore bool, privatePort int, sidecarURL string) error {
@@ -90,8 +114,18 @@ func (m *MockManagementSvc) UpdateModuleDiscovery(id string, restore bool, priva
 	return args.Error(0)
 }
 
+func (m *MockManagementSvc) GetTenantEntitlements(tenantName string, includeModules bool) (models.TenantEntitlementResponse, error) {
+	args := m.Called(tenantName, includeModules)
+	return args.Get(0).(models.TenantEntitlementResponse), args.Error(1)
+}
+
 func (m *MockManagementSvc) CreateTenantEntitlement(consortiumName string, tenantType constant.TenantType) error {
 	args := m.Called(consortiumName, tenantType)
+	return args.Error(0)
+}
+
+func (m *MockManagementSvc) UpgradeTenantEntitlement(consortiumName string, tenantType constant.TenantType, newApplicationID string) error {
+	args := m.Called(consortiumName, tenantType, newApplicationID)
 	return args.Error(0)
 }
 
@@ -1930,6 +1964,169 @@ func TestDetachCapabilitySetsFromRoles_HeaderCreationError(t *testing.T) {
 	assert.Error(t, err)
 	mockHTTP.AssertNotCalled(t, "GetRetryReturnStruct", mock.Anything, mock.Anything, mock.Anything)
 	mockHTTP.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+}
+
+func TestDetachCapabilitySetsFromRoles_GetRolesError(t *testing.T) {
+	// Arrange
+	mockHTTP := &testhelpers.MockHTTPClient{}
+	action := testhelpers.NewMockAction()
+	action.KeycloakAccessToken = "test-token"
+	mockVault := &MockVaultClient{}
+	mockMgmt := &MockManagementSvc{}
+	svc := keycloaksvc.New(action, mockHTTP, mockVault, mockMgmt)
+
+	mockHTTP.On("GetRetryReturnStruct",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).
+		Return(errors.New("get roles failed"))
+
+	// Act
+	err := svc.DetachCapabilitySetsFromRoles("test-tenant")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get roles failed")
+	mockHTTP.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+}
+
+func TestDetachCapabilitySetsFromRoles_NotFoundIgnored(t *testing.T) {
+	// Arrange
+	mockHTTP := &testhelpers.MockHTTPClient{}
+	action := testhelpers.NewMockAction()
+	action.KeycloakAccessToken = "test-token"
+	action.ConfigRoles = map[string]any{
+		"admin": map[string]any{},
+	}
+	mockVault := &MockVaultClient{}
+	mockMgmt := &MockManagementSvc{}
+	svc := keycloaksvc.New(action, mockHTTP, mockVault, mockMgmt)
+
+	rolesResponse := models.KeycloakRolesResponse{
+		Roles: []models.KeycloakRole{
+			{ID: "role-1", Name: "admin"},
+		},
+	}
+
+	mockHTTP.On("GetRetryReturnStruct",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).
+		Run(func(args mock.Arguments) {
+			target := args.Get(2).(*models.KeycloakRolesResponse)
+			*target = rolesResponse
+		}).
+		Return(nil)
+
+	mockHTTP.On("Delete",
+		mock.MatchedBy(func(urlStr string) bool {
+			return strings.Contains(urlStr, "/roles/role-1/capability-sets")
+		}),
+		mock.Anything).
+		Return(apperrors.ErrHTTP404NotFound)
+
+	// Act
+	err := svc.DetachCapabilitySetsFromRoles("test-tenant")
+
+	// Assert
+	// 404 errors should be logged but not returned as errors
+	assert.NoError(t, err)
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestDetachCapabilitySetsFromRoles_DeleteError(t *testing.T) {
+	// Arrange
+	mockHTTP := &testhelpers.MockHTTPClient{}
+	action := testhelpers.NewMockAction()
+	action.KeycloakAccessToken = "test-token"
+	action.ConfigRoles = map[string]any{
+		"admin": map[string]any{},
+	}
+	mockVault := &MockVaultClient{}
+	mockMgmt := &MockManagementSvc{}
+	svc := keycloaksvc.New(action, mockHTTP, mockVault, mockMgmt)
+
+	rolesResponse := models.KeycloakRolesResponse{
+		Roles: []models.KeycloakRole{
+			{ID: "role-1", Name: "admin"},
+		},
+	}
+
+	mockHTTP.On("GetRetryReturnStruct",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).
+		Run(func(args mock.Arguments) {
+			target := args.Get(2).(*models.KeycloakRolesResponse)
+			*target = rolesResponse
+		}).
+		Return(nil)
+
+	mockHTTP.On("Delete",
+		mock.MatchedBy(func(urlStr string) bool {
+			return strings.Contains(urlStr, "/roles/role-1/capability-sets")
+		}),
+		mock.Anything).
+		Return(errors.New("delete failed"))
+
+	// Act
+	err := svc.DetachCapabilitySetsFromRoles("test-tenant")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "delete failed")
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestDetachCapabilitySetsFromRoles_RoleNotInConfig(t *testing.T) {
+	// Arrange
+	mockHTTP := &testhelpers.MockHTTPClient{}
+	action := testhelpers.NewMockAction()
+	action.KeycloakAccessToken = "test-token"
+	action.ConfigRoles = map[string]any{
+		"admin": map[string]any{},
+	}
+	mockVault := &MockVaultClient{}
+	mockMgmt := &MockManagementSvc{}
+	svc := keycloaksvc.New(action, mockHTTP, mockVault, mockMgmt)
+
+	rolesResponse := models.KeycloakRolesResponse{
+		Roles: []models.KeycloakRole{
+			{ID: "role-1", Name: "user"}, // Not in config
+			{ID: "role-2", Name: "admin"},
+		},
+	}
+
+	mockHTTP.On("GetRetryReturnStruct",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).
+		Run(func(args mock.Arguments) {
+			target := args.Get(2).(*models.KeycloakRolesResponse)
+			*target = rolesResponse
+		}).
+		Return(nil)
+
+	// Only admin role should be deleted, not user role
+	mockHTTP.On("Delete",
+		mock.MatchedBy(func(urlStr string) bool {
+			return strings.Contains(urlStr, "/roles/role-2/capability-sets")
+		}),
+		mock.Anything).
+		Return(nil)
+
+	// Act
+	err := svc.DetachCapabilitySetsFromRoles("test-tenant")
+
+	// Assert
+	assert.NoError(t, err)
+	mockHTTP.AssertExpectations(t)
+	// Verify Delete was NOT called for role-1
+	mockHTTP.AssertNotCalled(t, "Delete",
+		mock.MatchedBy(func(urlStr string) bool {
+			return strings.Contains(urlStr, "/roles/role-1/capability-sets")
+		}),
+		mock.Anything)
 }
 
 func TestAttachCapabilitySetsToRoles_WithAllCapabilitySets(t *testing.T) {

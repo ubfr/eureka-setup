@@ -19,8 +19,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
 	"github.com/spf13/cobra"
 )
 
@@ -69,7 +69,6 @@ func (run *Run) updateRealmAccessTokenSettingsAndRelogin(configTenant string) er
 	if err := run.Config.KeycloakSvc.UpdateRealmAccessTokenSettings(configTenant, constant.KeycloakTenantRealmAccessTokenLifespan); err != nil {
 		return err
 	}
-	slog.Info(run.Config.Action.Name, "text", "Realm settings have been updated", "realm", configTenant)
 	if err := run.setKeycloakAccessTokenIntoContext(configTenant); err != nil {
 		return err
 	}

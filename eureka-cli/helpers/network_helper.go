@@ -5,8 +5,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/folio-org/eureka-cli/constant"
-	"github.com/folio-org/eureka-cli/errors"
+	"github.com/folio-org/eureka-setup/eureka-cli/constant"
+	"github.com/folio-org/eureka-setup/eureka-cli/errors"
 )
 
 // ==================== Hostname ====================
@@ -90,4 +90,14 @@ func ApplicationFormURLEncodedHeaders() map[string]string {
 	return map[string]string{
 		constant.ContentTypeHeader: constant.ApplicationFormURLEncoded,
 	}
+}
+
+// ==================== Sidecar URL ====================
+
+func GetSidecarURL(moduleName string, privatePort int) string {
+	if strings.HasPrefix(moduleName, "edge") {
+		return fmt.Sprintf("http://%s.eureka:%d", moduleName, privatePort)
+	}
+
+	return fmt.Sprintf("http://%s-sc.eureka:%d", moduleName, privatePort)
 }

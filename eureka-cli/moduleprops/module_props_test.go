@@ -6,10 +6,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/folio-org/eureka-cli/action"
-	"github.com/folio-org/eureka-cli/field"
-	"github.com/folio-org/eureka-cli/helpers"
-	"github.com/folio-org/eureka-cli/moduleprops"
+	"github.com/folio-org/eureka-setup/eureka-cli/action"
+	"github.com/folio-org/eureka-setup/eureka-cli/field"
+	"github.com/folio-org/eureka-setup/eureka-cli/helpers"
+	"github.com/folio-org/eureka-setup/eureka-cli/moduleprops"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -237,6 +237,60 @@ func TestReadBackendModules_ConfigurableProperties(t *testing.T) {
 		require.Len(t, result, 1)
 		module := result["mod-inventory"]
 		assert.Equal(t, 8090, module.PrivatePort)
+	})
+
+	t.Run("TestReadBackendModules_ConfigurableProperties_WithPortServer_CompatibilityAlias", func(t *testing.T) {
+		// Arrange - test compatibility: port-server works alongside private-port
+		act := &action.Action{
+			Name:                       "test-action",
+			Param:                      &action.Param{},
+			ReservedPorts:              []int{},
+			ConfigApplicationPortStart: 8000,
+			ConfigApplicationPortEnd:   9000,
+			ConfigBackendModules: map[string]any{
+				"mod-inventory": map[string]any{
+					field.ModulePrivatePortEntry: 0,    // Can be any value, port-server takes precedence
+					field.ModulePortServerEntry:  8091, // This should be used
+				},
+			},
+		}
+		mp := moduleprops.New(act)
+
+		// Act
+		result, err := mp.ReadBackendModules(false, false)
+
+		// Assert
+		assert.NoError(t, err)
+		require.Len(t, result, 1)
+		module := result["mod-inventory"]
+		assert.Equal(t, 8091, module.PrivatePort, "port-server should be used when both fields exist")
+	})
+
+	t.Run("TestReadBackendModules_ConfigurableProperties_PortServerPrecedence", func(t *testing.T) {
+		// Arrange - test that port-server takes precedence over private-port
+		act := &action.Action{
+			Name:                       "test-action",
+			Param:                      &action.Param{},
+			ReservedPorts:              []int{},
+			ConfigApplicationPortStart: 8000,
+			ConfigApplicationPortEnd:   9000,
+			ConfigBackendModules: map[string]any{
+				"mod-inventory": map[string]any{
+					field.ModulePrivatePortEntry: 8090,
+					field.ModulePortServerEntry:  8095,
+				},
+			},
+		}
+		mp := moduleprops.New(act)
+
+		// Act
+		result, err := mp.ReadBackendModules(false, false)
+
+		// Assert
+		assert.NoError(t, err)
+		require.Len(t, result, 1)
+		module := result["mod-inventory"]
+		assert.Equal(t, 8095, module.PrivatePort, "port-server should take precedence over private-port")
 	})
 
 	t.Run("TestReadBackendModules_ConfigurableProperties_WithDeployModuleFalse", func(t *testing.T) {
