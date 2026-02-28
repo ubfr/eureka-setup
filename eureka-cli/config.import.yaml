@@ -135,6 +135,7 @@ backend-modules:
       KONG_WRITE_TIMEOUT: "941241418"
     resources:
       cpus: 2
+      memory: 900
   mgr-tenants:
     port: 9902
     use-vault: true
@@ -189,6 +190,8 @@ backend-modules:
       cpus: 4
       memory: 900
   mod-login-keycloak:
+    # Versions <3.1.0-SNAPSHOT.156 are unusable, do not use until addressed 
+    version: 3.1.0-SNAPSHOT.156
     use-vault: true
     port: 9905
     environment:
@@ -215,6 +218,7 @@ backend-modules:
   mod-permissions:
   mod-configuration:
   mod-users:
+    disable-system-user: true
   mod-roles:
   mod-password-validator:
   mod-settings:
@@ -224,6 +228,7 @@ backend-modules:
   mod-inventory-storage:
   mod-inventory:
     private-port: 9403
+    disable-system-user: true
   mod-quick-marc:
   ### Data Import Modules
   mod-data-import:
@@ -241,8 +246,10 @@ backend-modules:
   ### Acquisition Modules
   mod-orders-storage:
   mod-orders:
+    disable-system-user: true
   mod-invoice-storage:
   mod-invoice:
+    disable-system-user: true
   mod-organizations-storage:
   mod-organizations:
   mod-finance:
@@ -285,8 +292,8 @@ frontend-modules:
   folio_plugin-find-authority:
 custom-frontend-modules:
   folio_authorization-roles:
-    version: 2.1.1099000000000223
+    version: 2.1.1099000000000245
   folio_authorization-policies:
-    version: 2.0.1099000000000111
+    version: 2.0.1099000000000130
   folio_plugin-select-application:
-    version: 2.0.1099000000000124
+    version: 2.0.1099000000000130

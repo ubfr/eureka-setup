@@ -1,7 +1,7 @@
 profile:
-  name: ecs
+  name: combined
 application:
-  name: app-ecs
+  name: app-combined
   version: 1.0.0
   fetch-descriptors: false
   port-start: 30000
@@ -51,55 +51,39 @@ environment:
     -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
     -XX:MaxRAMPercentage=80.0 -Xms128m -Xmx400m 
     -Djdk.internal.httpclient.disableHostnameVerification=true
-consortiums:
-  ecs:
-    create-consortium: true
-    enable-central-ordering: true
+    -javaagent:/etc/otel/opentelemetry-javaagent.jar
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+template-environment:
+  OTEL_SERVICE_NAME: "{{.ModuleName}}"
+extra-volumes:
+  - $HOME/eureka/opentelemetry-javaagent.jar:/etc/otel/opentelemetry-javaagent.jar:ro
 tenants:
-  ecs:
-    consortium: ecs
+  diku:
     deploy-ui: true
-    single-tenant: false
-    enable-ecs-request: false
-    central-tenant: true
-    platform-complete-url: http://localhost:3000
-  university:
-    consortium: ecs
 roles:
-  ecs_admin_role:
-    consortium: ecs 
-    tenant: ecs
+  diku_admin_role:
+    tenant: diku
     capability-sets: ["all"]
-  university_admin_role:
-    consortium: ecs
-    tenant: university
-    capability-sets: ["all"]
-  university_user_role:
-    consortium: ecs
-    tenant: university
+  diku_user_role:
+    tenant: diku
     capability-sets: []
 users:
-  ecs_admin:
-    consortium: ecs 
-    tenant: ecs
+  diku_admin:
+    tenant: diku
     password: admin
-    first-name: ECS 
+    first-name: DIKU
     last-name: Admin
-    roles: ["ecs_admin_role"]
-  university_admin:
-    consortium: ecs
-    tenant: university
-    password: admin
-    first-name: University
-    last-name: Admin
-    roles: ["university_admin_role", "university_user_role"]
-  university_user:
-    consortium: ecs
-    tenant: university
+    roles: ["diku_admin_role", "diku_user_role"]
+  diku_user:
+    tenant: diku
     password: user
-    first-name: University
+    first-name: DIKU
     last-name: User
-    roles: []
+    roles: ["diku_user_role"]
 sidecar-module:
   # Must build locally for your OS and CPU
   image: folio-module-sidecar-native
@@ -197,7 +181,7 @@ backend-modules:
     disable-system-user: true
     port: 9904
     environment:
-      SINGLE_TENANT_UX: "true"
+      SINGLE_TENANT_UX: "false"
       INCLUDE_ONLY_VISIBLE_PERMISSIONS: "false"
       KAFKA_SYS_USER_TOPIC_RETRY_DELAY: 1s
       KAFKA_SYS_USER_TOPIC_RETRY_ATTEMPTS: "9223372036854775807"
@@ -232,23 +216,6 @@ backend-modules:
     port: 9907
     resources:
       cpus: 4
-  mod-consortia-keycloak:
-    use-vault: true
-    use-okapi-url: true
-    disable-system-user: true
-    port: 9908
-    environment:
-      SINGLE_TENANT_UX: "true"
-      KC_IDENTITY_PROVIDER_BASE_URL: http://keycloak.eureka:8080
-  mod-okapi-facade:
-    environment:
-      TENANT_APPS_TTL: 600s
-      AM_TLS_ENABLED: "false"
-      TM_TLS_ENABLED: "false"
-      TE_TLS_ENABLED: "false"
-      AM_CLIENT_URL: http://mgr-applications.eureka:8081
-      MT_CLIENT_URL: http://mgr-tenants.eureka:8081
-      TE_URL: http://mgr-tenant-entitlements.eureka:8081
   mod-permissions:
   mod-configuration:
   mod-users:
@@ -281,20 +248,6 @@ backend-modules:
     private-port: 9801
   mod-template-engine:
   mod-feesfines:
-  mod-search:
-    use-okapi-url: true
-    disable-system-user: true
-    environment:
-      ELASTICSEARCH_SERVER: "true"
-      ELASTICSEARCH_URL: http://elasticsearch.eureka:9200
-      ELASTICSEARCH_HOST: elasticsearch.eureka
-      ELASTICSEARCH_PORT: 9200
-  mod-fqm-manager:
-    deploy-module: false
-    environment:
-      IS_EUREKA: "true"
-      QUERY_RETENTION_DURATION: "3h"
-      TASK_EXECUTION_POOL_MAXSIZE: "10"
 frontend-modules:
   folio_stripes-core:
   folio_developer:
@@ -325,5 +278,3 @@ custom-frontend-modules:
     version: 2.0.1099000000000130
   folio_plugin-select-application:
     version: 2.0.1099000000000130
-  folio_consortia-settings:
-    version: 3.0.1099000000000188

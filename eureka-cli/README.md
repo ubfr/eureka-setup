@@ -19,6 +19,9 @@
     - [Undeploy the _ecs_ application](#undeploy-the-ecs-application)
     - [Deploy the _ecs-single_ application](#deploy-the-ecs-single-application)
     - [Undeploy the _ecs-single_ application](#undeploy-the-ecs-single-application)
+    - [Deploy the _ecs-migration_ application](#deploy-the-ecs-migration-application)
+    - [Undeploy the _ecs-migration_ application](#undeploy-the-ecs-migration-application)
+    - [Run IDP migration](#run-idp-migration)
     - [Deploy the import application](#deploy-the-import-application)
     - [Undeploy the import application](#undeploy-the-import-application)
     - [Deploy child applications](#deploy-child-applications)
@@ -37,6 +40,10 @@
   - [Using the UI](#using-the-ui)
   - [Using Single Tenant UX](#using-single-tenant-ux)
   - [Using the environment](#using-the-environment)
+  - [Using template environment variables](#using-template-environment-variables)
+  - [Using extra volumes](#using-extra-volumes)
+  - [Using OpenTelemetry LGTM stack](#using-opentelemetry-lgtm-stack)
+  - [Add missing Vault secrets](#add-missing-vault-secrets)
   - [Troubleshooting](#troubleshooting)
     - [General](#general)
     - [Command-based](#command-based)
@@ -55,14 +62,20 @@
 
 ## Prerequisites
 
-Install dependencies
+Install dependencies:
 
 - [Go](https://go.dev/doc/install) compiler: last development-tested version is `go1.25.3 windows/amd64`
 - [Rancher Desktop](https://rancherdesktop.io/) container daemon: last development-tested version is `v1.20.1`
   - Enable **dockerd (Moby)** container engine
   - Disable **Check for updates automatically**
+  - Disable **Enable Kubernetes**
 
-Configure hosts (add entries to `/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`)
+On Windows, it is recommended to work exclusively in Windows Terminal running Git Bash:
+
+- [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/install): Install for better shell experience when paired with Git Bash
+- [Git Bash](https://gitforwindows.org/): Add to Windows Terminal as new default profile & Unix-like shell environment that supports Bash commands
+
+Configure hosts (add entries to `/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`):
 
 - **Option 1 - Automated (recommended):**
   - **Linux/macOS:** `sudo ./misc/add-hosts.sh`
@@ -76,12 +89,14 @@ Configure hosts (add entries to `/etc/hosts` or `C:\Windows\System32\drivers\etc
 
 ## Monitor system components
 
+- [Dozzle](http://localhost:8888) UI: No auth
 - [Keycloak](http://keycloak.eureka:8080) Admin Console: admin/admin
 - [Vault](http://localhost:8200) UI (Userpass method): admin/admin
 - [Kafka](http://localhost:9080) UI: No auth
 - [Kong](http://localhost:8002) Admin GUI: No auth
 - [MinIO](http://localhost:9001) Console: minioadmin/minioadmin
 - [Kibana](http://localhost:15601) UI: No auth
+- [Grafana](http://localhost:4000) UI: No auth
 
 ## Commands
 
@@ -95,7 +110,7 @@ go build -o ./bin/ .
 env GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ./bin/ .
 ```
 
-> For more details, check out the [Build Binary Guide](docs/BUILD_BINARY_GUIDE.md) to build a platform-specific binary
+> For more details, check out the [Build Binary Guide](docs/BUILD_BINARY_GUIDE.md) to build a platform-specific binary.
 
 ### Install binary
 
@@ -106,7 +121,7 @@ go install
 eureka-cli deployApplication
 ```
 
-> If you wish to avoid the binary installation please use the relative path of the CLI binary, e.g. `./bin/eureka-cli` with the correct path to the config
+> If you wish to avoid the binary installation please use the relative path of the CLI binary, e.g. `./bin/eureka-cli` with the correct path to the config.
 
 ### (Optional) Enable autocompletion
 
@@ -118,7 +133,7 @@ echo "source <(eureka-cli completion bash)" >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
-> Type `eureka-cli` and hit TAB to see the available suggestions or full autocompletion
+> Type `eureka-cli` and hit TAB to see the available suggestions or full autocompletion.
 
 **Flags with smart autocompletion:**
 
@@ -137,14 +152,14 @@ Available flags:
 
 **Global flags (available for all commands):**
 
-| Long                    | Short | Description                                                                              |
-|-------------------------|-------|------------------------------------------------------------------------------------------|
-| `--buildImages`         | `-b`  | Build Docker images                                                                      |
-| `--configFile`          | `-c`  | Specify config file path                                                                 |
-| `--enableDebug`         | `-d`  | Enable debug mode                                                                        |
-| `--onlyRequired`        | `-q`  | Use only required system containers (deploySystem, deployApplication)                    |
-| `--overwriteFiles`      | `-o`  | Overwrite files in .eureka home directory                                                |
-| `--profile`             | `-p`  | Select profile (combined, combined-native, export, search, edge, ecs, ecs-single import) |
+| Long                    | Short | Description                                                                                                                    |
+|-------------------------|-------|--------------------------------------------------------------------------------------------------------------------------------|
+| `--buildImages`         | `-b`  | Build Docker images                                                                                                            |
+| `--configFile`          | `-c`  | Specify config file path                                                                                                       |
+| `--enableDebug`         | `-d`  | Enable debug mode                                                                                                              |
+| `--onlyRequired`        | `-q`  | Use only required system containers (deploySystem, deployApplication)                                                          |
+| `--overwriteFiles`      | `-o`  | Overwrite files in .eureka home directory                                                                                      |
+| `--profile`             | `-p`  | Select profile (combined, combined-native, combined-native-otel, export, search, edge, ecs, ecs-single, ecs-migration, import) |
 
 **Command-specific flags:**
 
@@ -198,7 +213,7 @@ Available flags:
 eureka-cli -c ./config.combined.yaml deployApplication
 ```
 
-> If no profile or config file is passed, the _combined_ profile will be inferred and used
+> If no profile or config file is passed, the _combined_ profile will be inferred and used.
 
 - Use the debug `-d` flag to troubleshoot your environment deployment and see how the CLI interacts with services by logging in verbose mode
 
@@ -218,7 +233,7 @@ eureka-cli deployApplication -q
 eureka-cli -p combined deployApplication
 ```
 
-> Available profiles are: _combined_, _combined-native_, _export_, _search_, _edge_, _ecs_, _ecs-single_ and _import_ (_combined_, _combined-native_, _ecs_, _ecs-single_ and _import_ are standalone applications)
+> Available profiles are: _combined_, _combined-native_, _combined-native-otel_, _export_, _search_, _edge_, _ecs_, _ecs-single_, _ecs-migration_ and _import_ (_combined_, _combined-native_, _combined-native-otel_, _ecs_, _ecs-single_, _ecs-migration_ and _import_ are standalone applications).
 
 - It can be combined with the `-o` flag to overwrite all existing files in the `.eureka` home directory to receive changes from upstream
 
@@ -231,7 +246,7 @@ eureka-cli deployApplication -oq
 
 ![CLI Deploy Combined with Only Required System Containers](images/cli_deploy_combined_only_required.png)
 
-> Deploys the system without optional containers depending on the profile, such as _netcat_, _kafka-ui_, _minio_, _createbuckets_, _elasticsearch_, _kibana_ and _ftp-server_
+> Deploys the system without optional containers depending on the profile, such as _netcat_, _kafka-ui_, _minio_, _createbuckets_, _elasticsearch_, _kibana_ and _ftp-server_.
 
 - In case you want to update your local repositories of _folio-kong_, _folio-keycloak_ and _platform-complete_ (UI), you can do so with the combined `-bu` flags
 
@@ -239,7 +254,7 @@ eureka-cli deployApplication -oq
 eureka-cli deployApplication -bu
 ```
 
-> This will update the cloned projects and force-build Docker images locally before deploying the environment
+> This will update the cloned projects and force-build Docker images locally before deploying the environment.
 
 - System containers can also be built or rebuilt separately from environment deployment. This is particularly useful if you want to verify the images without a full deployment
 
@@ -277,7 +292,7 @@ export AWS_ECR_FOLIO_REPO=<repository_url>
 AWS_SDK_LOAD_CONFIG=true eureka-cli deployApplication
 ```
 
-> See docs/AWS_CLI.md to prepare AWS CLI beforehand
+> See docs/AWS_CLI_SETUP_GUIDE.md to prepare AWS CLI beforehand.
 
 ### Deploy the _ecs_ application
 
@@ -306,6 +321,29 @@ eureka-cli -p ecs-single deployApplication -oq
 ```bash
 eureka-cli -p ecs-single undeployApplication
 ```
+
+### Deploy the _ecs-migration_ application
+
+The _ecs-migration_ profile deploys a single consortium with one central and eight member tenants. This profile is primarily used to cross-check production workflows when there are issues reported with the migration to ECS. Because of the number of tenants involved, it is advised to run this profile with the maximum amount of resources to avoid frequent restarts on failure.
+
+```bash
+eureka-cli -p ecs-migration deployApplication -oq
+```
+
+### Undeploy the _ecs-migration_ application
+
+```bash
+eureka-cli -p ecs-migration undeployApplication
+```
+
+### Run IDP migration
+
+```bash
+# Create/remove IDP users in Keycloak
+./migrate_users.sh -a {{create OR delete}} --consortium-id {{consortium uuid}}
+```
+
+> The migration progress can be monitored from the `federated_identity` table in the Keycloak DB.
 
 ### Deploy the import application
 
@@ -363,17 +401,17 @@ eureka-cli -p edge deployApplication
 eureka-cli -p {{profile}} undeployApplication
 ```
 
-> Replace `{{app}}` or `{{profile}}` with either of the supported child profiles: _export_, _search_ or _edge_
+> Replace `{{app}}` or `{{profile}}` with either of the supported child profiles: _export_, _search_ or _edge_.
 
 ### Intercept a module
 
-The Intercept command allows rerouting traffic from a Kong service to a custom sidecar before reaching your local instance started in IntelliJ
+The Intercept command allows rerouting traffic from a Kong service to a custom sidecar before reaching your local instance started in IntelliJ.
 
 - Start your local module instance in IntelliJ with correct environment variables and JVM flags
 
 ![CLI Intercept Module](images/cli_intercept_module_1.png)
 
-- Enable interception to instance in Intellij by deploying a custom sidecar
+- Enable interception to instance in IntelliJ by deploying a custom sidecar
 
 ```bash
 # With custom module and sidecar URLs
@@ -401,7 +439,7 @@ eureka-cli -p import interceptModule -n mod-orders -gm 36002 -s 37002
 ```bash
 eureka-cli interceptModule -n mod-orders -r
 
-# With a different profile, e.g. using the import profiles
+# With a different profile, e.g. using the import profile
 eureka-cli -p import interceptModule -n mod-orders -r
 
 # Restore using the locally built module image, saved with foliolocal namespace
@@ -410,11 +448,11 @@ eureka-cli interceptModule -n mod-orders -r --namespace foliolocal
 
 ![CLI Intercept Module](images/cli_intercept_module_5.png)
 
-To intercept multiple modules, make sure to use the right set of environment variables, JVM flags and instance ports for each target module
+To intercept multiple modules, make sure to use the right set of environment variables, JVM flags and instance ports for each target module.
 
 ### Create a port proxy
 
-Create a port proxy (Windows only), to route traffic to a specific deployed sidecar container. This command helps resolving some HTTP client issues in some modules when intercepted by the _interceptModule_ command.
+Create a port proxy (Windows only) to route traffic to a specific deployed sidecar container. This command can help resolve some HTTP client issues in some modules when intercepted by the _interceptModule_ command.
 
 - To create a proxy between your instance deployed in IntelliJ and some sidecar in the environment, pass the module name to which the sidecar is associated with (e.g. _mod-inventory-storage_), and the external port number of the HTTP server on the sidecar
 
@@ -424,20 +462,20 @@ Create a port proxy (Windows only), to route traffic to a specific deployed side
 eureka-cli createPortProxy -n mod-inventory-storage -s 37002
 ```
 
-> This command assumes that the host, e.g. `mod-inventory-storage-sc.eureka` is added to `/etc/hosts` beforehand, because on some corporate machines scripted addition of hosts can be banned by group policies
+> This command assumes that the host, e.g. `mod-inventory-storage-sc.eureka` is added to `/etc/hosts` beforehand, because on some corporate machines scripted addition of hosts can be banned by group policies.
 
 ### Upgrade a module
 
 The upgrade command opens up the possibility to either upgrade or downgrade a particular module to a specific SNAPHOT or other versions, including the released ones. In order for it to work, we need to have the Maven CLI configured globally (see how to [install](https://maven.apache.org/install.html) and [configure](https://maven.apache.org/configure.html) Maven for your OS).
 
-- To upgrade a module, pass the module name together with the path to the cloned repository, which we will be use to build the artifact before making the container image
+- To upgrade a module, pass the module name together with the path to the cloned repository, which we will use to build the artifact before making the container image
 
 ```bash
 # Here we upgrade mod-orders from 13.1.0-SNAPSHOT.1093 to 13.1.0-SNAPSHOT.1094
 eureka-cli -p combined-native upgradeModule -n mod-orders --modulePath ~/Folio/folio-modules/mod-orders
 ```
 
-> The version is automatically resolved and incremented; image will be built with _foliolocal_ namespace
+> The version is automatically resolved and incremented; image will be built with _foliolocal_ namespace.
 
 ![CLI Upgrade Module](images/cli_upgrade_module_1.png)
 
@@ -448,11 +486,11 @@ eureka-cli -p combined-native upgradeModule -n mod-orders --modulePath ~/Folio/f
 eureka-cli -p combined-native upgradeModule -n mod-orders --moduleVersion 13.1.0-SNAPSHOT.1093 --namespace folioci --modulePath ~/Folio/folio-modules/mod-orders
 ```
 
-> We set namespace to folioci in order to use the existing Docker Hub image
+> We set namespace to folioci in order to use the existing Docker Hub image.
 
 ![CLI Upgrade Module](images/cli_upgrade_module_2.png)
 
-In both case the application patch version will be incremented up, as this does not have any functional reason for the CLI to rollback. Additionally, if the application is associated with multiple tenant entitlements, all of them will be upgraded to the latest version.
+In both cases, the application patch version will be incremented, as this does not have any functional reason for the CLI to roll back. Additionally, if the application is associated with multiple tenant entitlements, all of them will be upgraded to the latest version.
 
 - The upgrade command also has other flags that can be passed in order to skip a certain step in the process.
 
@@ -462,7 +500,7 @@ In both case the application patch version will be incremented up, as this does 
 
 The CLI includes several useful commands to enhance developer productivity. Here are the most important ones that can be used independently.
 
-- Lists deployed system containers
+- List deployed system containers
 
 ```bash
 eureka-cli listSystem
@@ -527,7 +565,7 @@ eureka-cli getEdgeApiKey -t diku -x diku_admin
 eureka-cli -p {{profile}} reindexElasticsearch
 ```
 
-> This command assumes that _mod-search_ module and _elasticsearch_ system container are deployed or if `{{profile}}` is being replaced by either _search_, _ecs_ or _ecs-single_ profiles
+> This command assumes that _mod-search_ module and _elasticsearch_ system container are deployed or if `{{profile}}` is being replaced by either _search_, _ecs_, _ecs-single_ or _ecs-migration_ profiles.
 
 - Check if module internal ports are accessible
 
@@ -537,7 +575,7 @@ eureka-cli checkPorts
 
 ![CLI Check Ports](images/cli_check_ports.png)
 
-> The CLI also exposes an internal port 5005 for all modules and sidecars that can be used for remote debugging in IntelliJ
+> The CLI also exposes an internal port 5005 for all modules and sidecars that can be used for remote debugging in IntelliJ.
 
 ## Using a custom folio-module-sidecar
 
@@ -557,7 +595,7 @@ mvn clean package -DskipTests
 docker build --tag custom-folio-module-sidecar:1.0.0 .
 ```
 
-> This example uses a non-native image build, see <https://github.com/folio-org/folio-module-sidecar/blob/master/README.md> for how to build a native Docker image
+> This example uses a non-native image build, see <https://github.com/folio-org/folio-module-sidecar/blob/master/README.md> for how to build a native Docker image.
 
 - Use the newly built `custom-folio-module-sidecar:1.0.0` local image in your config by setting `sidecar-module.custom-namespace` to true
 
@@ -568,7 +606,7 @@ sidecar-module:
   custom-namespace: true
 ```
 
-> The `version` must be set explicitly
+> The `version` must be set explicitly.
 
 - Deploy the environment with this config, in our example we deploy an _edge_ application with `custom-folio-module-sidecar:1.0.0` sidecars
 
@@ -601,7 +639,7 @@ mvn clean install -Pnative -DskipTests \
   -Dquarkus.native.builder-image=quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
 ```
 
-> Builds a native binary using a container-based GraalVM with a Linux toolchain
+> This builds a native binary using a container-based GraalVM with a Linux toolchain.
 
 - Build a custom local Docker image
 
@@ -621,7 +659,7 @@ sidecar-module:
   ]
 ```
 
-> The `version` must be set explicitly
+> The `version` must be set explicitly.
 
 - Deploy the environment using the _combined-native_ profile that already has `JAVA_OPTIONS` env var removed from the `sidecar-module` in the config, as this is not interpreted by the substrate VM in the image
 
@@ -650,7 +688,7 @@ backend-modules:
     local-descriptor-path: "/path/to/module/target/ModuleDescriptor.json"
 ```
 
-> When `local-descriptor-path` is specified, the Docker image will not be pulled from a registry and the descriptor will be loaded from the local filesystem
+> When `local-descriptor-path` is specified, the Docker image will not be pulled from a registry and the descriptor will be loaded from the local filesystem.
 
 - Deploy the environment with your local module
 
@@ -679,7 +717,7 @@ eureka-cli deployApplication
 
 The environment depends on the [platform-complete](https://github.com/folio-org/platform-complete) project to combine and assemble frontend and backend modules into a single UI package. By default, the CLI uses a pre-built Docker image of _platform-complete_ from DockerHub to deploy the UI container.
 
-- If there is a need to use a different namespace, override the `namespaces.platform-complete-ui` key in the config, for example in `config.combined.yaml`
+- To use a different namespace, override the `namespaces.platform-complete-ui` key in the config, for example in `config.combined.yaml`
 
 ```yaml
 namespaces:
@@ -692,7 +730,7 @@ namespaces:
 eureka-cli buildAndPushUi -n {{namespace}} -t diku -u
 ```
 
-> Replace {{namespace}} with your DockerHub namespace of choice, and use `-u` flag only if you want to update your local repository with upstream changes
+> Replace {{namespace}} with your DockerHub namespace of choice, and use `-u` flag only if you want to update your local repository with upstream changes.
 
 - To use the newly built image, remove the old container and create a new one
 
@@ -701,7 +739,7 @@ eureka-cli undeployUi
 eureka-cli deployUi
 ```
 
-> This will pull the latest Docker image from the registry and create a UI container out of it
+> This will pull the latest Docker image from the registry and create a UI container out of it.
 
 The CLI also supports building and deploying the UI image in-place, during either `deployApplication` execution or with `deployUi` command.
 
@@ -715,9 +753,9 @@ eureka-cli deployUi -b -u
 
 ## Using Single Tenant UX
 
-Single tenant UX is by default enabled for both _ecs_ and _ecs-single_ profiles. This functionality allows users in member tenant to automatically log-in in their respective tenant space from a single user login form, configured for the central tenant. Under the hood, the implementation behind Single Tenant UX uses shadow users created in the central tenant and the Keycloak realm to perform authentication using the correct member tenant identity provider.
+Single tenant UX is enabled by default for _ecs_, _ecs-single_ and _ecs-migration_ profiles. This functionality allows users in member tenants to automatically log in to their respective tenant spaces from a single user login form configured for the central tenant. Single Tenant UX uses shadow users created in the central tenant and the Keycloak realm to perform authentication with the correct member tenant identity provider.
 
-- To disable this functionality from running automatically during the deployment, set `SINGLE_TENANT_UX` from `true` to `false` for both `mod-users-keycloak` and `mod-consortia-keycloak` backend modules
+- To disable this functionality from running automatically during the deployment, set `SINGLE_TENANT_UX` from `true` to `false` for both `mod-users-keycloak` and `mod-consortia-keycloak` backend modules.
 
 ## Using the environment
 
@@ -735,13 +773,13 @@ If your environment was deployed using the _ecs_ profile, your consortiums are r
 
 ![UI ECS Main page](images/ui_ecs_main_page.png)
 
-> It contains 3 tenants, _ecs_ central tenant and _university_ and _college_ member tenants
+> It contains 3 tenants, _ecs_ central tenant and _university_ and _college_ member tenants.
 
 - And the second one can be accessed from `http://localhost:3001` (via an incognito Chrome browser) using `ecs_admin2` username and `admin` password
 
 ![UI ECS2 Main page](images/ui_ecs2_main_page.png)
 
-> It contains 2 tenants, _ecs2_ central tenant and _university2_ member tenant
+> It contains 2 tenants, _ecs2_ central tenant and _university2_ member tenant.
 
 - Kong gateway is available at `http://localhost:8000` and can be used to get an access token directly from the backend
 
@@ -763,7 +801,7 @@ curl --request POST \
   --verbose
 ```
 
-> Using _combined_, _combined-native_ or _import_ standalone profiles, because these profiles create _diku\_admin_ and _diku\_user_ users
+> Use _combined_, _combined-native_, _combined-native-otel_, or _import_ standalone profiles, because these profiles create _diku\_admin_ and _diku\_user_ users.
 
 ```bash
 # Admin user: ecs_admin
@@ -783,13 +821,128 @@ curl --request POST \
   --verbose
 ```
 
-- Using an _ecs_ profile that creates _ecs\_admin_ and _ecs\_admin2_ users in different consortiums
+> Use an _ecs_ profile that creates _ecs\_admin_ and _ecs\_admin2_ users in different consortiums.
+
+## Using template environment variables
+
+The `template-environment` config key works like `environment` but supports per-module placeholder resolution. Values containing `{{.ModuleName}}` are resolved to the module's name at deploy time.
+
+**Supported placeholder:** `{{.ModuleName}}` — replaced with the module name (e.g. `mod-orders`)
+
+```yaml
+template-environment:
+  OTEL_SERVICE_NAME: "{{.ModuleName}}"
+```
+
+- Per-module `environment` entries in `backend-modules` can override template values (they appear later in the env slice)
+- If `template-environment` is omitted from a profile, no template env vars are injected
+
+## Using extra volumes
+
+The `extra-volumes` config key accepts a list of volume mounts applied to all backend modules.
+
+```yaml
+extra-volumes:
+  - /host/path:/container/path
+```
+
+- Extra volumes are prepended to any per-module `volumes` entries
+- If `extra-volumes` is omitted, no additional volumes are mounted
+
+## Using OpenTelemetry LGTM stack
+
+OpenTelemetry LGTM is a docker image that combines OpenTelemetry Collector with Grafana UI, Grafana Loki, Grafana Tempo, Prometheus and Pyroscope. Use this image with the OpenTelemetry instrumentation agent to deploy an environment with advanced logging, tracing and metrics collection enabled in a few steps.
+
+- Download and configure the latest OpenTelemetry instrumentation agent (the latest tested is **v2.25.0**)
+
+```bash
+mkdir -p $HOME/eureka
+rm -rf $HOME/eureka/opentelemetry-javaagent.jar
+curl -L -o $HOME/eureka/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.25.0/opentelemetry-javaagent.jar
+```
+
+> Check GitHub releases page to use a different version of the agent: <https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases>.
+
+- Add extra volumes in the config file
+
+```yaml
+extra-volumes:
+  - $HOME/eureka/opentelemetry-javaagent.jar:/etc/otel/opentelemetry-javaagent.jar:ro
+```
+
+- Add **OTEL_SERVICE_NAME** template environment in the config file
+
+```yaml
+template-environment:
+  OTEL_SERVICE_NAME: "{{.ModuleName}}"
+```
+
+- Add a new `javaagent` VM option to the **JAVA_OPTS** global environment variable in the config file (use existing `environment` and `JAVA_OPTS` keys)
+
+```yaml
+environment:
+  ...
+  # Java
+  JAVA_OPTIONS: >-
+    ...
+    -javaagent:/etc/otel/opentelemetry-javaagent.jar
+  ...
+```
+
+- Add extra global environment variables to the config file (use existing `environment` key)
+
+```yaml
+environment:
+  ...
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+  ...
+```
+
+- Start your profile of choice as normal and then deploy OpenTelemetry LGTM service separately
+
+```bash
+# Deploy a profile of choice, e.g. combined-native-otel
+eureka-cli deployApplication -p combined-native-otel -oq --cleanup
+
+# Deploy OpenTelemetry LGTM service
+docker compose -p eureka -f ~/.eureka/misc/docker-compose.otel.yaml up -d
+```
+
+> Make sure the native sidecar image is already built on your machine before deploying any of the `combined-native*` profiles.
+
+- Verify that the containers were deployed and contain `opentelemetry-javaagent.jar` as a volume mount
+
+```bash
+docker inspect --format='{{json .Mounts}}' eureka-mgr-tenants | jq .
+```
+
+![Inspect OpenTelemetry agent](images/cli_inspect_otel_agent.png)
+
+## Add missing Vault secrets
+
+The environment may fail to add Vault secrets during tenant entitlement. If a secret is missing, you can add it post-deployment with the `add_missing_secret.sh` script.
+
+- Add the missing `mod-users` secret
+
+```bash
+# Single user
+./add_missing_secret.sh -t diku -u admin
+
+# Multiple users (space-delimited)
+./add_missing_secret.sh -t diku -u "mod-users mod-roles-keycloak mod-inventory"
+```
+
+> This script upserts the secret to Vault and resets the associated Keycloak user password in the specified realm (it is idempotent).
 
 ## Troubleshooting
 
 ### General
 
-If there are multiple instances of a container daemon (e.g. **Rancher Desktop**, **Docker Desktop**, **Podman**) running on the host machine
+If there are multiple instances of a container daemon (e.g. **Rancher Desktop**, **Docker Desktop**, **Podman**) running on the host machine:
 
 - Verify that `DOCKER_HOST` is set to point to the correct daemon (otherwise `/var/run/docker.sock` will be used)
 
@@ -822,7 +975,7 @@ Module readiness checks are failing
 
 - Rerun the deployment again with more available RAM
 
-When trying to deploy with `eureka-cli deployApplication -bu` or building with `eureka-cli buildSystem -u` (retry if fails on `Error: worktree contains unstaged changes`)
+When trying to deploy with `eureka-cli deployApplication -bu` or building with `eureka-cli buildSystem -u` (retry if fails on `Error: worktree contains unstaged changes`):
 
 ```txt
 ERROR: unable to select packages:
@@ -830,7 +983,7 @@ ERROR: unable to select packages:
     breaks: world[bind-tools=9.18.39-r0]
 ```
 
-- Update your local CLI git repository and rebuild the binary, our Dockefiles in the `misc` folder no longer dependent on pinned and non-deterministic package versions of Alpine Linux
+- Update your local CLI git repository and rebuild the binary; our Dockerfiles in the `misc` folder are no longer dependent on pinned and non-deterministic package versions of Alpine Linux
 
 ---
 

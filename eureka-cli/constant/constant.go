@@ -17,10 +17,10 @@ const (
 	ConsortiumTenantStatusWait        = 10 * time.Second
 
 	// Readiness retries
-	ModuleReadinessMaxRetries     = 50
+	ModuleReadinessMaxRetries     = 70
 	KongRouteReadinessMaxRetries  = 30
-	ConsumerGroupRebalanceRetries = 30
-	ConsumerGroupPollMaxRetries   = 30
+	ConsumerGroupRebalanceRetries = 70
+	ConsumerGroupPollMaxRetries   = 70
 
 	// Context timeout durations
 	ContextTimeoutDockerAPIVersion   = 15 * time.Second
@@ -161,6 +161,7 @@ const (
 	ProtocolPattern       = `^[a-zA-Z]+://`
 
 	// System containers name
+	DozzleContainer        = "dozzle"
 	PostgreSQLContainer    = "postgres"
 	KafkaContainer         = "kafka"
 	KafkaToolsContainer    = "kafka-tools"
@@ -178,8 +179,8 @@ const (
 	KeycloakAdminUsername                  = "admin"
 	KeycloakAdminPassword                  = "admin"
 	KeycloakMasterRealm                    = "master"
-	KeycloakMasterRealmAccessTokenLifespan = 1800
-	KeycloakTenantRealmAccessTokenLifespan = 900
+	KeycloakMasterRealmAccessTokenLifespan = 3600
+	KeycloakTenantRealmAccessTokenLifespan = 3600
 
 	// System container ports
 	KongPort        = "8000"
@@ -270,6 +271,7 @@ func GetNamespaces() []string {
 
 func GetInitialRequiredContainers() []string {
 	return []string{
+		DozzleContainer,
 		PostgreSQLContainer,
 		KafkaContainer,
 		KafkaToolsContainer,
@@ -283,21 +285,23 @@ func GetInitialRequiredContainers() []string {
 // ==================== Profiles ====================
 
 const (
-	CombinedProfile       = "combined"
-	CombinedNativeProfile = "combined-native"
-	ExportProfile         = "export"
-	SearchProfile         = "search"
-	EdgeProfile           = "edge"
-	ECSProfile            = "ecs"
-	ECSSingleProfile      = "ecs-single"
-	ECSMigrationProfile   = "ecs-migration"
-	ImportProfile         = "import"
+	CombinedProfile           = "combined"
+	CombinedNativeProfile     = "combined-native"
+	CombinedNativeOtelProfile = "combined-native-otel"
+	ExportProfile             = "export"
+	SearchProfile             = "search"
+	EdgeProfile               = "edge"
+	ECSProfile                = "ecs"
+	ECSSingleProfile          = "ecs-single"
+	ECSMigrationProfile       = "ecs-migration"
+	ImportProfile             = "import"
 )
 
 func GetProfiles() []string {
 	return []string{
 		CombinedProfile,
 		CombinedNativeProfile,
+		CombinedNativeOtelProfile,
 		ExportProfile,
 		SearchProfile,
 		EdgeProfile,

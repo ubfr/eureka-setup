@@ -102,7 +102,8 @@ func TestGetInitialRequiredContainers(t *testing.T) {
 	containers := GetInitialRequiredContainers()
 
 	// Assert
-	assert.Len(t, containers, 7)
+	assert.Len(t, containers, 8)
+	assert.Contains(t, containers, DozzleContainer)
 	assert.Contains(t, containers, PostgreSQLContainer)
 	assert.Contains(t, containers, KafkaContainer)
 	assert.Contains(t, containers, KafkaToolsContainer)
@@ -117,13 +118,14 @@ func TestGetInitialRequiredContainers_OrderPreserved(t *testing.T) {
 	containers := GetInitialRequiredContainers()
 
 	// Assert - Verify order is preserved
-	assert.Equal(t, PostgreSQLContainer, containers[0])
-	assert.Equal(t, KafkaContainer, containers[1])
-	assert.Equal(t, KafkaToolsContainer, containers[2])
-	assert.Equal(t, VaultContainer, containers[3])
-	assert.Equal(t, KeycloakProxyContainer, containers[4])
-	assert.Equal(t, KeycloakContainer, containers[5])
-	assert.Equal(t, KongContainer, containers[6])
+	assert.Equal(t, DozzleContainer, containers[0])
+	assert.Equal(t, PostgreSQLContainer, containers[1])
+	assert.Equal(t, KafkaContainer, containers[2])
+	assert.Equal(t, KafkaToolsContainer, containers[3])
+	assert.Equal(t, VaultContainer, containers[4])
+	assert.Equal(t, KeycloakProxyContainer, containers[5])
+	assert.Equal(t, KeycloakContainer, containers[6])
+	assert.Equal(t, KongContainer, containers[7])
 }
 
 // ==================== GetProfiles Tests ====================
@@ -133,9 +135,10 @@ func TestGetProfiles(t *testing.T) {
 	profiles := GetProfiles()
 
 	// Assert
-	assert.Len(t, profiles, 9)
+	assert.Len(t, profiles, 10)
 	assert.Contains(t, profiles, CombinedProfile)
 	assert.Contains(t, profiles, CombinedNativeProfile)
+	assert.Contains(t, profiles, CombinedNativeOtelProfile)
 	assert.Contains(t, profiles, ExportProfile)
 	assert.Contains(t, profiles, SearchProfile)
 	assert.Contains(t, profiles, EdgeProfile)
@@ -152,13 +155,14 @@ func TestGetProfiles_OrderPreserved(t *testing.T) {
 	// Assert
 	assert.Equal(t, CombinedProfile, profiles[0])
 	assert.Equal(t, CombinedNativeProfile, profiles[1])
-	assert.Equal(t, ExportProfile, profiles[2])
-	assert.Equal(t, SearchProfile, profiles[3])
-	assert.Equal(t, EdgeProfile, profiles[4])
-	assert.Equal(t, ECSProfile, profiles[5])
-	assert.Equal(t, ECSSingleProfile, profiles[6])
-	assert.Equal(t, ECSMigrationProfile, profiles[7])
-	assert.Equal(t, ImportProfile, profiles[8])
+	assert.Equal(t, CombinedNativeOtelProfile, profiles[2])
+	assert.Equal(t, ExportProfile, profiles[3])
+	assert.Equal(t, SearchProfile, profiles[4])
+	assert.Equal(t, EdgeProfile, profiles[5])
+	assert.Equal(t, ECSProfile, profiles[6])
+	assert.Equal(t, ECSSingleProfile, profiles[7])
+	assert.Equal(t, ECSMigrationProfile, profiles[8])
+	assert.Equal(t, ImportProfile, profiles[9])
 }
 
 // ==================== GetDefaultProfile Tests ====================
@@ -217,6 +221,7 @@ func TestProfileConstants(t *testing.T) {
 	// Assert
 	assert.Equal(t, "combined", CombinedProfile)
 	assert.Equal(t, "combined-native", CombinedNativeProfile)
+	assert.Equal(t, "combined-native-otel", CombinedNativeOtelProfile)
 	assert.Equal(t, "export", ExportProfile)
 	assert.Equal(t, "search", SearchProfile)
 	assert.Equal(t, "edge", EdgeProfile)
