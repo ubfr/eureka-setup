@@ -163,7 +163,7 @@ func (ms *ManagementSvc) CreateApplication(extract *models.RegistryExtract) erro
 					"name":    module.Metadata.Name,
 					"version": *module.Metadata.Version,
 				}
-				if ms.Action.ConfigApplicationFetchDescriptors {
+				if ms.Action.ConfigApplicationFetchDescriptors || isLocalModule {
 					frontendModuleDescriptors = append(frontendModuleDescriptors, extract.ModuleDescriptors[module.ID])
 				} else {
 					newFrontendModule["url"] = moduleDescriptorURL
@@ -306,6 +306,10 @@ func (ms *ManagementSvc) RemoveApplications(applicationName, ignoreAppID string)
 	}
 
 	for _, entry := range apps.ApplicationDescriptors {
+		name := helpers.GetString(entry, "name")
+		if name != applicationName {
+			continue
+		}
 		id := helpers.GetString(entry, "id")
 		if id == ignoreAppID {
 			continue

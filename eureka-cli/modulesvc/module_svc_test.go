@@ -572,6 +572,7 @@ func TestGetSidecarEnv(t *testing.T) {
 	mockModuleEnv.On("KeycloakEnv", mock.Anything).Return([]string{"KEYCLOAK_ENV=set"})
 	mockModuleEnv.On("SidecarEnv", mock.Anything, mock.Anything, 8081, "http://mod-test:8081", "http://sidecar:8081").
 		Return([]string{"SIDECAR_ENV=set"})
+	mockModuleEnv.On("ModuleEnv", mock.Anything, map[string]any(nil)).Return([]string{"SIDECAR_ENV=set"})
 
 	svc := New(action, nil, nil, nil, mockModuleEnv)
 
@@ -592,6 +593,48 @@ func TestGetSidecarEnv(t *testing.T) {
 
 	// Assert
 	assert.NotEmpty(t, env)
+	mockModuleEnv.AssertExpectations(t)
+}
+
+func TestGetSidecarEnv_WithPerSidecarEnv(t *testing.T) {
+	// Arrange
+	action := testhelpers.NewMockAction()
+	mockModuleEnv := new(testhelpers.MockModuleEnv)
+
+	sidecarEnvMap := map[string]any{
+		"ROUTING_DYNAMIC_ENABLED":          "true",
+		"SIDECAR_FORWARD_UNKNOWN_REQUESTS": "false",
+	}
+
+	mockModuleEnv.On("VaultEnv", []string(nil), mock.Anything).Return([]string{"VAULT_ENV=set"})
+	mockModuleEnv.On("KeycloakEnv", mock.Anything).Return([]string{"KEYCLOAK_ENV=set"})
+	mockModuleEnv.On("SidecarEnv", mock.Anything, mock.Anything, 8081, "http://mod-scheduler:8081", "http://sidecar:8081").
+		Return([]string{"SIDECAR_ENV=set"})
+	mockModuleEnv.On("ModuleEnv", mock.Anything, sidecarEnvMap).
+		Return([]string{"SIDECAR_ENV=set", "ROUTING_DYNAMIC_ENABLED=true", "SIDECAR_FORWARD_UNKNOWN_REQUESTS=false"})
+
+	svc := New(action, nil, nil, nil, mockModuleEnv)
+
+	containers := &models.Containers{}
+
+	module := &models.ProxyModule{
+		Metadata: models.ProxyModuleMetadata{
+			Name: "mod-scheduler",
+		},
+	}
+
+	backendModule := models.BackendModule{
+		PrivatePort: 8081,
+		SidecarEnv:  sidecarEnvMap,
+	}
+
+	// Act
+	env := svc.GetSidecarEnv(containers, module, backendModule, "http://mod-scheduler:8081", "http://sidecar:8081")
+
+	// Assert
+	assert.NotEmpty(t, env)
+	assert.Contains(t, env, "ROUTING_DYNAMIC_ENABLED=true")
+	assert.Contains(t, env, "SIDECAR_FORWARD_UNKNOWN_REQUESTS=false")
 	mockModuleEnv.AssertExpectations(t)
 }
 
@@ -935,6 +978,218 @@ func TestCheckModuleReadiness_DefaultMaxRetries(t *testing.T) {
 	default:
 		// Success - no error sent, defaults to constant.ModuleReadinessMaxRetries
 	}
+	mockHTTP.AssertExpectations(t)
+}
+
+// ==================== CheckModuleReadinessByURL Tests ====================
+
+func TestCheckModuleReadinessByURL_Success(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+
+	wg := &sync.WaitGroup{}
+	errCh := make(chan error, 1)
+	wg.Add(1)
+
+	// Act
+	go svc.CheckModuleReadinessByURL(wg, errCh, "test-module", "http://192.168.122.1:8082")
+	wg.Wait()
+	close(errCh)
+
+	// Assert
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	default:
+	}
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestCheckModuleReadinessByURL_Failure(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusServiceUnavailable, nil)
+
+	wg := &sync.WaitGroup{}
+	errCh := make(chan error, 1)
+	wg.Add(1)
+
+	// Act
+	go svc.CheckModuleReadinessByURL(wg, errCh, "test-module", "http://192.168.122.1:8082")
+	wg.Wait()
+	close(errCh)
+
+	// Assert
+	err := <-errCh
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "module test-module")
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestCheckModuleReadinessByURL_TrailingSlash(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+
+	wg := &sync.WaitGroup{}
+	errCh := make(chan error, 1)
+	wg.Add(1)
+
+	// Act
+	go svc.CheckModuleReadinessByURL(wg, errCh, "test-module", "http://192.168.122.1:8082/")
+	wg.Wait()
+	close(errCh)
+
+	// Assert
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	default:
+	}
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestCheckModuleReadinessByURL_EventualSuccess(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusServiceUnavailable, nil).Times(2)
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil).Once()
+
+	wg := &sync.WaitGroup{}
+	errCh := make(chan error, 1)
+	wg.Add(1)
+
+	// Act
+	go svc.CheckModuleReadinessByURL(wg, errCh, "test-module", "http://192.168.122.1:8082")
+	wg.Wait()
+	close(errCh)
+
+	// Assert
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	default:
+	}
+	mockHTTP.AssertExpectations(t)
+}
+
+// ==================== CheckModuleAndSidecarReadiness Tests ====================
+
+func TestCheckModuleAndSidecarReadiness_WithURLs(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	pair := &ModulePair{
+		ModuleName: "mod-test",
+		ModuleURL:  "http://192.168.122.1:8082",
+		SidecarURL: "http://192.168.122.1:30056",
+		BackendModule: &models.BackendModule{
+			ModuleExposedServerPort:  8082,
+			SidecarExposedServerPort: 30056,
+		},
+	}
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+	mockHTTP.On("Ping", "http://192.168.122.1:30056/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+
+	// Act
+	err := svc.CheckModuleAndSidecarReadiness(pair)
+
+	// Assert
+	assert.NoError(t, err)
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestCheckModuleAndSidecarReadiness_WithoutURLs(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	pair := &ModulePair{
+		ModuleName: "mod-test",
+		BackendModule: &models.BackendModule{
+			ModuleExposedServerPort:  8082,
+			SidecarExposedServerPort: 30056,
+		},
+	}
+
+	// Port-based URLs use the gateway template: http://localhost:<port>/admin/health
+	mockHTTP.On("Ping", "http://localhost:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+	mockHTTP.On("Ping", "http://localhost:30056/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+
+	// Act
+	err := svc.CheckModuleAndSidecarReadiness(pair)
+
+	// Assert
+	assert.NoError(t, err)
+	mockHTTP.AssertExpectations(t)
+}
+
+func TestCheckModuleAndSidecarReadiness_MixedURLs(t *testing.T) {
+	// Arrange
+	mockHTTP := new(testhelpers.MockHTTPClient)
+	action := testhelpers.NewMockAction()
+	svc := New(action, mockHTTP, nil, nil, nil)
+	svc.ReadinessMaxRetries = 3
+	svc.ReadinessWait = 1 * time.Millisecond
+
+	pair := &ModulePair{
+		ModuleName: "mod-test",
+		ModuleURL:  "http://192.168.122.1:8082",
+		SidecarURL: "", // Empty - should fall back to port-based
+		BackendModule: &models.BackendModule{
+			ModuleExposedServerPort:  8082,
+			SidecarExposedServerPort: 30056,
+		},
+	}
+
+	mockHTTP.On("Ping", "http://192.168.122.1:8082/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+	mockHTTP.On("Ping", "http://localhost:30056/admin/health", mock.Anything).
+		Return(http.StatusOK, nil)
+
+	// Act
+	err := svc.CheckModuleAndSidecarReadiness(pair)
+
+	// Assert
+	assert.NoError(t, err)
 	mockHTTP.AssertExpectations(t)
 }
 

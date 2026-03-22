@@ -191,7 +191,7 @@ backend-modules:
       cpus: 4
       memory: 900
   mod-login-keycloak:
-    # Versions <3.1.0-SNAPSHOT.156 are unusable, do not use until addressed 
+    # Versions >3.1.0-SNAPSHOT.156 are unusable, do not use until addressed 
     version: 3.1.0-SNAPSHOT.156
     use-vault: true
     port: 9905
@@ -213,6 +213,9 @@ backend-modules:
     use-vault: true
     use-okapi-url: true
     disable-system-user: true
+    sidecar-environment:
+      ROUTING_DYNAMIC_ENABLED: "true"
+      SIDECAR_FORWARD_UNKNOWN_REQUESTS: "false"
     port: 9907
     resources:
       cpus: 4
@@ -273,8 +276,8 @@ frontend-modules:
   folio_plugin-find-authority:
 custom-frontend-modules:
   folio_authorization-roles:
-    version: 2.1.1099000000000245
+    version: 2.1.1099000000000251
   folio_authorization-policies:
-    version: 2.0.1099000000000130
+    version: 2.0.1099000000000136
   folio_plugin-select-application:
-    version: 2.0.1099000000000130
+    version: 2.0.1099000000000149
