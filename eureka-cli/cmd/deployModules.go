@@ -56,12 +56,11 @@ func (run *Run) DeployModules() error {
 	}
 
 	slog.Info(run.Config.Action.Name, "text", "READING BACKEND MODULE REGISTRIES")
-	installJsonURLs := run.Config.Action.GetCombinedInstallJsonURLs()
-	modules, err := run.Config.RegistrySvc.GetModules(installJsonURLs, true, true)
+	modules, err := run.Config.RegistrySvc.GetModules(true, true)
 	if err != nil {
 		return err
 	}
-	run.Config.RegistrySvc.ExtractModuleMetadata(modules)
+	run.Config.RegistrySvc.ResolveModuleMetadata(modules)
 
 	client, err := run.Config.DockerClient.Create()
 	if err != nil {

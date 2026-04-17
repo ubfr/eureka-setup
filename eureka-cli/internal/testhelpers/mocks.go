@@ -143,21 +143,21 @@ func (m *MockRegistrySvc) GetNamespace(version string) string {
 	return args.String(0)
 }
 
-func (m *MockRegistrySvc) ExtractModuleMetadata(modules *models.ProxyModulesByRegistry) {
+func (m *MockRegistrySvc) ResolveModuleMetadata(modules *models.ProxyModulesByRegistry) {
 	m.Called(modules)
-}
-
-func (m *MockRegistrySvc) GetModules(installJsonURLs map[string]string, useRemote, verbose bool) (*models.ProxyModulesByRegistry, error) {
-	args := m.Called(installJsonURLs, useRemote, verbose)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.ProxyModulesByRegistry), args.Error(1)
 }
 
 func (m *MockRegistrySvc) GetAuthorizationToken() (string, error) {
 	args := m.Called()
 	return args.String(0), args.Error(1)
+}
+
+func (m *MockRegistrySvc) GetModules(verbose bool, forceRefresh bool) (*models.ProxyModulesByRegistry, error) {
+	args := m.Called(verbose, forceRefresh)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.ProxyModulesByRegistry), args.Error(1)
 }
 
 // MockModuleEnv is a mock implementation of moduleenv.ModuleEnvProcessor

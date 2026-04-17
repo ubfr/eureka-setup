@@ -59,12 +59,11 @@ func (run *Run) InterceptModule() error {
 		return err
 	}
 
-	installJsonURLs := run.Config.Action.GetCombinedInstallJsonURLs()
-	modules, err := run.Config.RegistrySvc.GetModules(installJsonURLs, true, false)
+	modules, err := run.Config.RegistrySvc.GetModules(false, false)
 	if err != nil {
 		return err
 	}
-	run.Config.RegistrySvc.ExtractModuleMetadata(modules)
+	run.Config.RegistrySvc.ResolveModuleMetadata(modules)
 
 	client, err := run.Config.DockerClient.Create()
 	if err != nil {
